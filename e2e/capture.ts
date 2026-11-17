@@ -52,3 +52,25 @@ export async function warmShots(query: string, steps: [sec: number, prev?: numbe
     return out;
   } finally { await browser.close(); }
 }
+
+/**
+ * Последовательность вызовов плеера в одной странице: 'show' — перемотка (история TAA сбрасывается и прогревается),
+ * 'step' — следующий кадр без перемотки (как при проигрывании: история копится). Для проверок «камера стоит» и «камера едет».
+ */
+export async function seqShots(query: string, calls: ['show' | 'step', number][], withPng = false): Promise<Shot[]> {
+  const browser = await chromium.launch({ channel: 'chrome', args: ARGS });
+  try {
+    const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(BASE + query);
+    await page.waitForFunction(() => (window as unknown as { __player?: Player }).__player);
+    const out: Shot[] = [];
+    for (const [kind, sec] of calls) {
+      const script = shotScript(sec).replace('p.show(' + sec + ', undefined)', kind === 'show' ? 'p.show(' + sec + ')' : 'p.step(' + sec + ')');
+      const r = await page.evaluate(script) as Raw;
+      out.push({ ...r, px: Buffer.from(r.px, 'base64'), png: withPng ? await page.locator('#view').screenshot() : Buffer.alloc(0), errors });
+    }
+    return out;
+  } finally { await browser.close(); }
+}

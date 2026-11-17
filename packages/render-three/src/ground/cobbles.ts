@@ -14,8 +14,7 @@ export function cobbleFootprint(p: N, cell: number): { dx: N; dy: N; px: N } {
   return { dx, dy, px: length(dx).mul(length(dy)).sqrt().toVar() };
 }
 /** Выше этого следа (в камнях) узора нет: средний цвет, плоская нормаль. */
-// (в образце 2.5 с затуханием от 0.8: там узор сглаживает TAA, у нас до задачи 1.2 его нет — гасим раньше, иначе вдали рябь)
-export const COBBLES_GONE = 1.2;
+export const COBBLES_GONE = 2.5;
 
 function voronoi(s: N, seed: N): { toward: N; edge: N; grad: N; r: N } {
   const cell = s.floor(), f = s.fract();
@@ -41,20 +40,20 @@ function voronoi(s: N, seed: N): { toward: N; edge: N; grad: N; r: N } {
 /** Пятна износа и грязи по мощению: множитель яркости в мировой точке p. */
 export const cobblePatches = (p: N): N => mx_noise_float(p.mul(0.35)).mul(0.25).add(mx_noise_float(p.mul(1.1).add(5)).mul(0.12)).add(1);
 /** Цвет мощения вдали (мельче пикселя): среднее камней по пятнам; темнее среднего альбедо, потому что нормали-купола затеняют камни вблизи. */
-export const cobbleAverage = (patches: N): N => vec3(0.062, 0.056, 0.047).mul(patches);
+export const cobbleAverage = (patches: N): N => vec3(0.05, 0.045, 0.038).mul(patches);
 
 /** Цвет брусчатки и наклон нормали (x, z) в мировой точке p; след пикселя fp — из cobbleFootprint. Производных не берёт: можно строить внутри If. */
 export function cobbles(p: N, seed: N, cell: number, fp: { dx: N; dy: N; px: N }): { colour: N; tilt: N } {
   const v = voronoi(p.div(cell), seed);
   // край шва: его производная из градиента двух ближайших камней (производные GPU на швах дают ступеньки)
   const aa = abs(dot(v.grad, fp.dx)).add(abs(dot(v.grad, fp.dy))).max(0.02);
-  const stone = smoothstep(float(0.09).sub(aa), float(0.09).add(aa), v.edge);
-  const tone = mix(vec3(0.05, 0.046, 0.04), vec3(0.17, 0.15, 0.13), v.r).mul(mx_noise_float(p.mul(9)).mul(0.25).add(1));
-  const joint = mix(vec3(0.025, 0.02, 0.014), vec3(0.03, 0.045, 0.018), smoothstep(0.2, 0.6, mx_noise_float(p.mul(1.3))));
+  const stone = smoothstep(float(0.12).sub(aa), float(0.12).add(aa), v.edge);
+  const tone = mix(vec3(0.03, 0.028, 0.024), vec3(0.14, 0.128, 0.11), v.r).mul(mx_noise_float(p.mul(9)).mul(0.25).add(1));
+  const joint = mix(vec3(0.012, 0.01, 0.007), vec3(0.018, 0.03, 0.01), smoothstep(0.2, 0.6, mx_noise_float(p.mul(1.3))));
   const patches = cobblePatches(p);
-  const near = float(1).sub(smoothstep(0.3, COBBLES_GONE, fp.px));
+  const near = float(1).sub(smoothstep(0.8, COBBLES_GONE, fp.px));
   const colour = mix(cobbleAverage(patches), mix(joint, tone.mul(patches), stone), near);
   // купол: нормаль наклонена от середины камня наружу, сильнее у края
-  const lean = float(1).sub(smoothstep(0.05, 0.4, v.edge)).mul(0.9).mul(near);
+  const lean = float(1).sub(smoothstep(0.05, 0.45, v.edge)).mul(1.4).mul(near);
   return { colour, tilt: v.toward.normalize().mul(lean) };
 }

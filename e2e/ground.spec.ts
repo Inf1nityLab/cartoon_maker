@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { coldShot, warmShots, type Shot } from './capture.ts';
+import { coldShot, seqShots, warmShots, type Shot } from './capture.ts';
 import { diff, MAX_CHANNEL, MAX_SHARE } from './pixels.ts';
 
 // Задача 1.4: земля и дорога. Кадры для глаз — в test-results/1.4-keep (в .gitignore; Playwright чистит test-results
@@ -9,6 +9,7 @@ const OUT = 'test-results/1.4-keep';
 const W = 1280, H = 720, DT = 1 / 30;
 const ROAD = `/?scene=test-road&backend=webgl2&film=1&w=${W}&h=${H}`;
 const keep = (name: string, s: Shot) => { mkdirSync(OUT, { recursive: true }); writeFileSync(`${OUT}/${name}.png`, s.png); };
+const MAX_STILL = 0.01; // измерено 0.0028 (17 из 6080 пикселей) при ровно 0 в средней полосе; рябь дала бы десятки процентов
 const MAX_RATIO = 0.5; // D(1)/D(16): у чистого сдвига ≈ 0.1…0.3, у ряби → 1
 const luma = (px: Buffer, i: number) => 0.2126 * px[i]! + 0.7152 * px[i + 1]! + 0.0722 * px[i + 2]!;
 
@@ -30,8 +31,8 @@ test.describe('дорога test-road', () => {
   }
 
   test('серия 6 кадров вдоль дороги: брусчатка вдали не мерцает', async () => {
-    // Камера едет 2 м/с. Серия для глаз: 6 кадров через 0.1 с (шаг 0.2 м) → series-0..5.png.
-    const eyes = await warmShots(ROAD, [[0], [0.1, 0], [0.2, 0.1], [0.3, 0.2], [0.4, 0.3], [0.5, 0.4]], true);
+    // Камера едет 2 м/с. Серия для глаз: проигрывание с TAA (история копится), 6 кадров через 0.1 с (шаг 0.2 м) → series-0..5.png.
+    const eyes = await seqShots(ROAD, [['show', 0], ['step', 0.1], ['step', 0.2], ['step', 0.3], ['step', 0.4], ['step', 0.5]], true);
     eyes.forEach((s, k) => keep(`series-${k}`, s));
     // Мерцание: кадр 0 против кадров через k тиков (1 тик = 1/60 с, камера 3.3 см на тик). Узор, который просто
     // сдвигается, расходится с кадром 0 тем сильнее, чем дальше сдвиг (D растёт с k). Рябь — шум, который не зависит
@@ -53,5 +54,24 @@ test.describe('дорога test-road', () => {
     writeFileSync(`${OUT}/series-flicker.json`, JSON.stringify({ bands, ticks: TICKS.slice(1), meanAbsLumaDiffFromFrame0: res, ratio_D1_over_D16: ratio }, null, 2));
     expect(eyes.concat(tiny).every((s) => s.errors.length === 0)).toBe(true);
     for (const [name, r] of Object.entries(ratio)) expect(r, `${name}: D(1)/D(16) = ${r.toFixed(2)}; D по сдвигам: ${res[name]!.map((x) => x.toFixed(2)).join(' ')}`).toBeLessThan(MAX_RATIO);
+  });
+
+  test('камера стоит: два кадра подряд с TAA после прогрева не рябят в дальней полосе', async () => {
+    // show(0) прогревает историю TAA (3 кадра), затем два кадра step(0) подряд: джиттер у них разный, картинка — нет.
+    const [, a, b] = await seqShots(ROAD, [['show', 0], ['step', 0], ['step', 0]]);
+    const share = (x0: number, x1: number, y0: number, y1: number) => {
+      let n = 0, t = 0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const i = (y * W + x) * 4;
+        if (Math.max(Math.abs(a!.px[i]! - b!.px[i]!), Math.abs(a!.px[i + 1]! - b!.px[i + 1]!), Math.abs(a!.px[i + 2]! - b!.px[i + 2]!)) > 8) n++;
+        t++;
+      }
+      return n / t;
+    };
+    const res = { far: share(520, 680, 358, 396), mid: share(470, 770, 405, 450), whole: share(0, W, 0, H) };
+    mkdirSync(OUT, { recursive: true });
+    writeFileSync(`${OUT}/still-flicker.json`, JSON.stringify({ metric: 'доля пикселей с |Δ| > 8/255 между двумя кадрами step(0) подряд', ...res }, null, 2));
+    expect(a!.errors.concat(b!.errors)).toEqual([]);
+    expect(res.far, `доля в дальней полосе: ${res.far}`).toBeLessThanOrEqual(MAX_STILL);
   });
 });

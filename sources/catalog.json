@@ -11,6 +11,10 @@
         "src/nanite-lib/** -> packages/render-three/vendor/threejs-nanites/",
         "LICENSE -> packages/render-three/vendor/threejs-nanites/LICENSE"
       ],
+      "ideasUsed": [
+        "src/ground/cobbles.ts — брусчатка Вороного: купол, затухание по площади следа (код свой)",
+        "src/road.ts — карта расстояния до дороги (код свой)"
+      ],
       "excluded": [
         {
           "path": "public/models/lucy.nm, lucy4m.nm",
