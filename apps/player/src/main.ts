@@ -12,7 +12,20 @@ if (!checked.ok) {
   document.body.innerHTML = `<div class="err">Сцена не прошла проверку:\n${checked.errors.join('\n')}</div>`;
   throw new Error(checked.errors.join('\n'));
 }
-const doc: SceneDoc = checked.doc;
+const doc: SceneDoc = structuredClone(checked.doc);
+// Только для проверки света (e2e и глаза), в файл сцены не пишется: ?sun=<высота°>[,<азимут°>] — солнце;
+// ?flat=1 — плоская земля. Меняем копию документа до загрузки в движок, поэтому хэш WorldState честный.
+const q = new URLSearchParams(location.search);
+const sunQ = q.get('sun');
+if (sunQ !== null) {
+  const [el, az] = sunQ.split(',').map(Number);
+  const sky = doc.world.find((c) => c.type === 'Sky');
+  if (sky && el !== undefined && Number.isFinite(el)) sky.params = { ...sky.params, elevation: el, ...(az !== undefined && Number.isFinite(az) ? { azimuth: az } : {}) };
+}
+if (q.get('flat') === '1') {
+  const ter = doc.world.find((c) => c.type === 'Terrain');
+  if (ter) ter.params = { ...ter.params, style: 'flat' };
+}
 
 const engine = createEngine({ registry });
 engine.load(doc);
@@ -29,6 +42,8 @@ const adapter = createThreeAdapter(film ? { backend, mode: 'film', filmSize, pix
 // ?debug=motion — векторы движения цветом вместо кадра
 const debug = params.get('debug');
 adapter.setDebugView(debug === 'motion' ? 'motion' : null);
+// ?probe=hero — серый бокс 0.4 м у камеры для проверки теней (не часть сцены); &view=top — камера строго сверху
+if (params.get('probe') === 'hero') adapter.setProbe({ kind: 'hero', view: params.get('view') === 'top' ? 'top' : 'camera' });
 const canvas = $<HTMLCanvasElement>('view');
 await adapter.mount(canvas, doc, () => engine.sim());
 
@@ -104,6 +119,7 @@ function frame() {
   },
   // ?gpu=1: GPU-время последнего кадра, мс (замеры; в обычной работе не нужен)
   gpuMs: () => adapter.gpuMs(),
+  shadowInfo: () => adapter.shadowInfo(),
 };
 if (film) draw(); // пауза: первый кадр рисуем сразу
 frame();

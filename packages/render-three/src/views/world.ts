@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { defineView } from '../view.ts';
+import { dayK, sunLevels, sunVector } from '../light/math.ts';
 
 const lerpColor = (a: THREE.Color, b: THREE.Color, t: number) => a.clone().lerp(b, Math.max(0, Math.min(1, t)));
 const NIGHT = new THREE.Color('#0a1226'), DUSK = new THREE.Color('#ff8a4c'), DAY = new THREE.Color('#8ec1ee');
@@ -31,6 +32,7 @@ export const TerrainView = defineView('Terrain', {
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }));
     mesh.receiveShadow = true;
+    mesh.castShadow = true; // тени рельефа: холмы затеняют низины
     three.scene.add(mesh);
     return mesh;
   },
@@ -60,17 +62,16 @@ export const SkyView = defineView('Sky', {
     const sky = skyColor(elevation);
     three.scene.background = sky;
     three.scene.fog = new THREE.Fog(sky, 60, 320);
-    const k = Math.max(0, Math.min(1, elevation / 30));
-    const az = (azimuth * Math.PI) / 180, el = (Math.max(elevation, 0.5) * Math.PI) / 180;
-    const target = state.camera.target;
-    // тень следует за целью камеры
+    const k = dayK(elevation), lv = sunLevels(elevation);
+    const d = sunVector(elevation, azimuth), target = state.camera.target;
+    // направление света задают только эти две точки; каскады теней (light/sunShadow.ts) сами встают под камеру
     three.sunLight.target.position.set(target[0], target[1], target[2]);
-    three.sunLight.position.set(target[0] + Math.sin(az) * Math.cos(el) * 80, target[1] + Math.sin(el) * 80, target[2] + Math.cos(az) * Math.cos(el) * 80);
+    three.sunLight.position.set(target[0] + d[0] * 80, target[1] + d[1] * 80, target[2] + d[2] * 80);
     three.sunLight.color.set(lerpColor(new THREE.Color('#ff9a5a'), new THREE.Color('#fff4e0'), k));
-    three.sunLight.intensity = (elevation < 0 ? 0.15 : 0.5) + 2.6 * k;
-    three.hemi.intensity = 0.6 + 0.7 * k;
+    three.sunLight.intensity = lv.sun;
+    three.hemi.intensity = lv.hemi;
     three.hemi.color.copy(sky);
-    three.renderer.toneMappingExposure = 1.15 + 0.2 * k;
+    three.renderer.toneMappingExposure = lv.exposure;
   },
   dispose() {},
 });

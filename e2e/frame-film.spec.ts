@@ -5,7 +5,7 @@ import { diff, MAX_CHANNEL, MAX_SHARE } from './pixels.ts';
 // Задача 1.1: режим «фильм» и выход движения. Кадры складываем в e2e/report-1.1 (не в snapshots).
 // swiftshader (как в frames.spec.ts): на нём же и считаем допуски.
 const ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
-const BASE = 'http://localhost:5174';
+const BASE = `http://localhost:${Number(process.env.E2E_PORT ?? 5174)}`; // порт плеера: у каждой копии свой (playwright.config.ts)
 const W = 640, H = 360, DT = 1 / 30;
 const OUT = 'e2e/report-1.1';
 const FILM = `/?backend=webgl2&film=1&w=${W}&h=${H}`;

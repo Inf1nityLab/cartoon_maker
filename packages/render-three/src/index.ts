@@ -8,10 +8,14 @@ import { resolveFrame, type FrameOptions } from './film.ts';
 import { createFramePipeline, type DebugView } from './frame/pipeline.ts';
 import { MultipedView } from './views/multiped.ts';
 import { SkyView, TerrainView, WaterView } from './views/world.ts';
+import { createSunShadow, type CascadeInfo } from './light/sunShadow.ts';
+import { createProbe, type ProbeOptions } from './light/probe.ts';
 
 export * from './view.ts';
 export type { FrameMode, FrameOptions } from './film.ts';
 export type { DebugView } from './frame/pipeline.ts';
+export type { CascadeInfo } from './light/sunShadow.ts';
+export type { ProbeOptions } from './light/probe.ts';
 
 /** Единственное место, где живёт Three.js. Наружу не выходит ни один его объект. */
 export interface RenderAdapter {
@@ -25,6 +29,10 @@ export interface RenderAdapter {
   setDebugView(v: DebugView): void;
   /** Замер GPU-времени последнего render(), мс (нужен trackGpu; null — браузер не умеет). Только для замеров. */
   gpuMs(): Promise<number | null>;
+  /** Пробный объект для проверки теней (тест, не данные сцены). null — убрать. */
+  setProbe(p: ProbeOptions | null): void;
+  /** Каскады теней солнца: до какого расстояния, размер карты и тексела (м), смещения. */
+  shadowInfo(): CascadeInfo[];
   dispose(): void;
 }
 
@@ -44,6 +52,9 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
   let camera!: THREE.PerspectiveCamera;
   let controls: OrbitControls | null = null;
   let free = false;
+  let probeOpts: ProbeOptions | null = null; // задают до mount()
+  let sunShadow!: ReturnType<typeof createSunShadow>;
+  let probe!: ReturnType<typeof createProbe>;
   let lastTarget: [number, number, number] = [0, 0, 0];
   const mounted: { handle: unknown; view: ViewDef; id: string }[] = [];
 
@@ -60,14 +71,13 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoftShadowMap удалён в текущей версии three
       const scene = new THREE.Scene();
       const sunLight = new THREE.DirectionalLight('#ffffff', 2);
-      sunLight.castShadow = true;
-      sunLight.shadow.mapSize.set(2048, 2048);
-      const sc = sunLight.shadow.camera;
-      sc.left = sc.bottom = -40; sc.right = sc.top = 40; sc.near = 1; sc.far = 220;
       const hemi = new THREE.HemisphereLight('#bcd8ff', '#3b4a2a', 0.6);
       scene.add(sunLight, sunLight.target, hemi);
       three = { scene, renderer, sunLight, hemi, sim };
       camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 800);
+      sunShadow = createSunShadow(sunLight, renderer, camera);
+      probe = createProbe(scene);
+      probe.set(probeOpts);
       for (const inst of [...doc.world, ...Object.values(doc.entities)]) {
         const view = views[inst.type];
         if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst) });
@@ -80,6 +90,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
         camera.position.set(...state.camera.pos);
         camera.lookAt(...state.camera.target);
         camera.fov = state.camera.fov;
+        probe.place(camera, state.camera.pos, state.camera.target, snap.services.heightAt);
       }
     },
     render(requested) {
@@ -88,6 +99,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       controls?.update();
+      sunShadow.update(); // каскады и смещения под текущие fov/aspect: до рендера, чтобы кадр не зависел от прошлого
       const px = frame.pixels({ w, h });
       pipeline.render(three.scene, camera, px);
     },
@@ -96,6 +108,8 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       const ms = three.renderer.info.render.timestamp;
       return ms > 0 ? ms : null;
     },
+    setProbe(p) { probeOpts = p; probe?.set(p); },
+    shadowInfo: () => sunShadow.info().map((c) => ({ ...c })),
     setDebugView(v) { debugView = v; pipeline?.setDebug(v); },
     capture: () => createImageBitmap(canvas as HTMLCanvasElement),
     setFreeCamera(on) {
@@ -107,6 +121,8 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       controls?.dispose();
       for (const m of mounted) m.view.dispose(m.handle, three);
       mounted.length = 0;
+      probe.dispose();
+      sunShadow.dispose();
       pipeline.dispose();
       three.renderer.dispose();
     },
