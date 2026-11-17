@@ -12,10 +12,29 @@ export type EntityHandle = { id: string; pos: Vec3; heading: number; state: Reco
 export type CameraDofState = { focus: number | 'target'; range: number; strength: number };
 export type CameraState = { shot: string; pos: Vec3; target: Vec3; fov: number; dof?: CameraDofState };
 
-/** Сервисы, которые мир предоставляет компонентам (Terrain даёт heightAt, Water — waterLevel). */
+/** Дорога как поле: данные для вида (карта расстояний) и для рельефа. Только числа и функции, без three. */
+export type RoadField = {
+  halfWidth: number; // половина ширины мощения, м
+  shoulder: number; // ширина обочины и выравнивания рельефа, м
+  stone: number; // размер камня брусчатки, м
+  bounds: { x0: number; x1: number; z0: number; z1: number }; // где дорога влияет на землю (с обочиной)
+  /** Расстояние от (x, z) до края мощения, м; отрицательно на дороге. Далеко от дороги — любое число ≥ bounds-расстояния. */
+  edgeDistance(x: number, z: number): number;
+};
+
+/** Параметры сетки рельефа, по которой нарисована земля: вид берёт их отсюда, а не из сырых params (там нет умолчаний). */
+export type TerrainInfo = { size: number; segments: number; ground: 'lowpoly' | 'soil'; seed: number };
+
+/**
+ * Сервисы, которые мир предоставляет компонентам (Terrain даёт heightAt, Water — waterLevel, Road — grade и road).
+ * grade: рельеф под дорогой; Terrain вызывает его при сборке сетки высот (base — высота без дороги).
+ */
 export type Services = {
   heightAt: (x: number, z: number) => number;
   waterLevel: number;
+  grade?: (x: number, z: number, base: (x: number, z: number) => number) => number;
+  road?: RoadField;
+  terrain?: TerrainInfo;
 };
 
 /** Мировые сервисы. Компоненты не ссылаются друг на друга напрямую — только через ctx. */
@@ -32,6 +51,8 @@ export interface Ctx {
   path(id: string): PathSampler;
   entity(id: string): EntityHandle;
   camera: CameraState;
+  /** Сервис, зарегистрированный другим компонентом (читать лениво, после setup всех: порядок setup — порядок world). */
+  service<K extends keyof Services>(name: K): Services[K];
   /** Компонент регистрирует сервис (только в setup). */
   provide<K extends keyof Services>(name: K, impl: Services[K]): void;
   /** Цель → точка: id места/сущности или координаты. */

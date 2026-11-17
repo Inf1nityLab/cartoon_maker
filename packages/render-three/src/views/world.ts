@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { defineView } from '../view.ts';
+import { gridIndices, gridNormals, gridStep, sampleGrid } from '@cartoon/components';
 import { dayK, sunLevels, sunVector } from '../light/math.ts';
+import { createGroundMaterial } from '../ground/material.ts';
 
 const lerpColor = (a: THREE.Color, b: THREE.Color, t: number) => a.clone().lerp(b, Math.max(0, Math.min(1, t)));
 const NIGHT = new THREE.Color('#0a1226'), DUSK = new THREE.Color('#ff8a4c'), DAY = new THREE.Color('#8ec1ee');
@@ -13,31 +15,43 @@ export function skyColor(elevation: number): THREE.Color {
 }
 
 export const TerrainView = defineView('Terrain', {
-  mount(three, inst) {
-    const size = (inst.params.size as number | undefined) ?? 240;
-    const seg = 192;
-    const { heightAt, waterLevel } = three.sim().services;
-    const geo = new THREE.PlaneGeometry(size, size, seg, seg);
-    geo.rotateX(-Math.PI / 2);
-    const pos = geo.attributes.position!, colors = new Float32Array(pos.count * 3);
-    const low = new THREE.Color('#6b5a3a'), mid = new THREE.Color('#4f7a3a'), high = new THREE.Color('#8a9a6a'), c = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const h = heightAt(pos.getX(i), pos.getZ(i));
-      pos.setY(i, h);
-      const r = h - waterLevel; // высота над водой
-      c.copy(r < 1.2 ? low : r < 6 ? lerpColor(low, mid, (r - 1.2) / 2) : lerpColor(mid, high, (r - 6) / 5));
-      colors.set([c.r, c.g, c.b], i * 3);
+  mount(three) {
+    const { heightAt, waterLevel, terrain, road } = three.sim().services;
+    if (!terrain) throw new Error('Terrain: в services нет terrain (компонент не прошёл setup)');
+    // та же сетка и те же треугольники, по которым Terrain считает ctx.heightAt (components/terrain-grid.ts)
+    const spec = { size: terrain.size, segments: terrain.segments };
+    const heights = sampleGrid(spec, heightAt); // в вершинах heightAt равна значению сетки
+    const n = spec.segments, w = n + 1, step = gridStep(spec), half = spec.size / 2;
+    const pos = new Float32Array(w * w * 3);
+    for (let j = 0; j < w; j++) for (let i = 0; i < w; i++) pos.set([-half + i * step, heights[j * w + i]!, -half + j * step], (j * w + i) * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setIndex(new THREE.BufferAttribute(gridIndices(spec), 1));
+    let material: THREE.Material;
+    if (terrain.ground === 'soil') {
+      geo.setAttribute('normal', new THREE.BufferAttribute(gridNormals(spec, heights), 3));
+      material = createGroundMaterial({ seed: terrain.seed, road });
+    } else {
+      // лоуполи (v1): граненая раскраска по высоте над водой
+      const colors = new Float32Array(w * w * 3);
+      const low = new THREE.Color('#6b5a3a'), mid = new THREE.Color('#4f7a3a'), high = new THREE.Color('#8a9a6a'), c = new THREE.Color();
+      for (let k = 0; k < w * w; k++) {
+        const r = heights[k]! - waterLevel; // высота над водой
+        c.copy(r < 1.2 ? low : r < 6 ? lerpColor(low, mid, (r - 1.2) / 2) : lerpColor(mid, high, (r - 6) / 5));
+        colors.set([c.r, c.g, c.b], k * 3);
+      }
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      geo.computeVertexNormals();
+      material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true });
     }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }));
+    const mesh = new THREE.Mesh(geo, material);
     mesh.receiveShadow = true;
     mesh.castShadow = true; // тени рельефа: холмы затеняют низины
     three.scene.add(mesh);
     return mesh;
   },
   sync() {},
-  dispose(mesh, three) { three.scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); },
+  dispose(mesh, three) { three.scene.remove(mesh); mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose(); },
 });
 
 export const WaterView = defineView('Water', {

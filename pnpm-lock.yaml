@@ -265,6 +265,9 @@ importers:
 
   packages/render-three:
     dependencies:
+      '@cartoon/components':
+        specifier: workspace:*
+        version: link:../components
       '@cartoon/engine':
         specifier: workspace:*
         version: link:../engine

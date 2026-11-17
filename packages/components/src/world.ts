@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '@cartoon/engine';
 import { fbm } from './noise.ts';
+import { gridHeight, sampleGrid, type GridSpec } from './terrain-grid.ts';
 
 const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
@@ -13,6 +14,10 @@ export const TerrainParams = z.object({
   amplitude: z.number().min(0).max(40).default(7),
   scale: z.number().min(0.005).max(0.2).default(0.025),
   size: z.number().min(50).max(1000).default(240),
+  /** Клеток сетки на сторону: по ней нарисована земля, и по ней же считает высоту ctx.heightAt. */
+  segments: z.number().int().min(32).max(640).default(384),
+  /** lowpoly — граненая раскраска по высоте (как в версии 1); soil — почва и луг с вариациями, брусчатка на дороге. */
+  ground: z.enum(['lowpoly', 'soil']).default('soil'),
   lake: z.object({
     at: z.tuple([z.number(), z.number()]),
     radius: z.number().min(1).max(200),
@@ -21,7 +26,7 @@ export const TerrainParams = z.object({
 });
 export type TerrainParams = z.infer<typeof TerrainParams>;
 
-/** Высота рельефа: чистая функция от параметров. Поэтому не нужна в чекпоинтах. */
+/** Высота рельефа без дороги: чистая функция от параметров. Поэтому не нужна в чекпоинтах. */
 export function terrainHeight(p: TerrainParams, x: number, z: number): number {
   if (p.style === 'flat') return 0;
   // земля поднята на 0.8·amplitude: вода остаётся только в озере
@@ -30,14 +35,33 @@ export function terrainHeight(p: TerrainParams, x: number, z: number): number {
   return base - p.lake.depth * smoothstep(p.lake.radius, 0, d);
 }
 
-/** Рельеф: предоставляет ctx.heightAt. */
+/**
+ * Рельеф: предоставляет ctx.heightAt. Версия 2: высота — одна на CPU и GPU. Сетка высот (в вершинах: рельеф плюс
+ * выравнивание под дорогой, если есть Road) строится при первом обращении, heightAt — интерполяция по её
+ * треугольникам, и по тем же вершинам и треугольникам рисуется меш (render-three). За краем сетки — сама функция.
+ */
 export const Terrain = defineComponent({
   type: 'Terrain',
-  version: 1,
-  describe: 'Рельеф: холмы (fbm-шум) и впадина озера. Предоставляет ctx.heightAt(x, z).',
+  version: 2,
+  describe: 'Рельеф: холмы (fbm-шум) и впадина озера. Предоставляет ctx.heightAt(x, z): поверхность сетки, по которой нарисована земля; под Road рельеф выровнен.',
   params: TerrainParams,
   actions: {},
-  setup(ctx, p) { ctx.provide('heightAt', (x, z) => terrainHeight(p, x, z)); },
+  migrate: {
+    // v1: меш 192 клетки с граненой раскраской, heightAt считалась отдельно от меша. v2: тот же вид и та же сетка
+    // (явно заданные значения сильнее: код режиссёра пишет version 1 и при новых параметрах)
+    1: (p: Record<string, unknown>) => ({ segments: 192, ground: 'lowpoly', ...p }),
+  },
+  setup(ctx, p) {
+    const spec: GridSpec = { size: p.size, segments: p.segments };
+    const base = (x: number, zz: number) => terrainHeight(p, x, zz);
+    const graded = (x: number, zz: number) => { const g = ctx.service('grade'); return g ? g(x, zz, base) : base(x, zz); };
+    let grid: Float32Array | null = null; // лениво: все setup уже прошли, Road успел объявить grade
+    ctx.provide('heightAt', (x, zz) => {
+      grid ??= sampleGrid(spec, graded);
+      return gridHeight(spec, grid, x, zz) ?? graded(x, zz);
+    });
+    ctx.provide('terrain', { size: p.size, segments: p.segments, ground: p.ground, seed: p.seed });
+  },
   create: () => ({}),
   step() {},
   state: () => ({}),

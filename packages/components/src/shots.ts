@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineShot, type Ctx } from '@cartoon/engine';
-import { Target, type Vec3 } from '@cartoon/schema';
+import { Target, Vec3 as Vec3Z, type Vec3 } from '@cartoon/schema';
 
 const Common = z.object({
   target: Target,
@@ -111,4 +111,24 @@ export const Crane = defineShot({
     return { pos, target: [p[0], p[1] + 1, p[2]], fov: a.fov ?? 48 };
   },
   examples: ["s.at(50).camera.shot('crane', { target: spider, to: 30, duration: 8 })"],
+});
+
+export const Fixed = defineShot({
+  type: 'fixed',
+  describe: 'Камера в заданной точке и смотрит в заданную точку, опционально едет по прямой. Высоты — над землёй (aboveGround) или абсолютные.',
+  params: z.object({
+    at: Vec3Z.describe('[x, высота, z], м'),
+    look: Vec3Z.describe('куда смотрит [x, высота, z], м'),
+    aboveGround: z.boolean().default(true).describe('высоты отсчитываются от земли под точкой'),
+    velocity: z.tuple([z.number(), z.number()]).default([0, 0]).describe('скорость по земле [vx, vz], м/с: камера и точка взгляда едут вместе'),
+    fov: z.number().min(10).max(110).default(50),
+  }),
+  solve(a, ctx, t) {
+    const at = (p: Vec3): Vec3 => {
+      const x = p[0] + a.velocity[0] * t, zz = p[2] + a.velocity[1] * t;
+      return [x, a.aboveGround ? ctx.heightAt(x, zz) + p[1] : p[1], zz];
+    };
+    return { pos: at(a.at), target: at(a.look), fov: a.fov };
+  },
+  examples: ["s.at(0).camera.shot('fixed', { at: [0, 0.5, -18], look: [0, 0.4, 0], velocity: [0, 2] })"],
 });

@@ -36,7 +36,7 @@ export async function coldShot(query: string, sec: number, prev?: number): Promi
 }
 
 /** Несколько показов подряд в одной странице (без перезапуска): для проверки «кадр не зависит от истории». */
-export async function warmShots(query: string, steps: [sec: number, prev?: number][]): Promise<Shot[]> {
+export async function warmShots(query: string, steps: [sec: number, prev?: number][], withPng = false): Promise<Shot[]> {
   const browser = await chromium.launch({ channel: 'chrome', args: ARGS });
   try {
     const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
@@ -47,7 +47,7 @@ export async function warmShots(query: string, steps: [sec: number, prev?: numbe
     const out: Shot[] = [];
     for (const [sec, prev] of steps) {
       const r = await page.evaluate(shotScript(sec, prev)) as Raw;
-      out.push({ ...r, px: Buffer.from(r.px, 'base64'), png: Buffer.alloc(0), errors });
+      out.push({ ...r, px: Buffer.from(r.px, 'base64'), png: withPng ? await page.locator('#view').screenshot() : Buffer.alloc(0), errors });
     }
     return out;
   } finally { await browser.close(); }

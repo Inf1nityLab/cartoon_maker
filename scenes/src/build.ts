@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { scene01 } from './scene-01.ts';
 import { testRobot } from './test-robot.ts';
+import { testRoad } from './test-road.ts';
 
 // Собирает эталонные JSON из кода режиссёра: pnpm --filter @cartoon/scenes build
 writeFileSync(new URL('../scene-01.json', import.meta.url), JSON.stringify(scene01, null, 2) + '\n');
@@ -13,3 +14,4 @@ const film = {
   tracks: [],
 };
 writeFileSync(new URL('../film-01.json', import.meta.url), JSON.stringify(film, null, 2) + '\n');
+writeFileSync(new URL('../test-road.json', import.meta.url), JSON.stringify(testRoad, null, 2) + '\n');

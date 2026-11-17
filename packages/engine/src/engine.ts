@@ -81,6 +81,7 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
       return e;
     },
     get camera() { return camera; },
+    service: (name) => services[name],
     provide(name, impl) { (services as any)[name] = impl; },
     resolve(target) {
       if (typeof target !== 'string') return target;

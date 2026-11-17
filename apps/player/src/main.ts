@@ -3,14 +3,15 @@ import { createEngine, validateAgainstRegistry } from '@cartoon/engine';
 import { registry, FILM_LOOK_PRESETS, type FilmLookPreset } from '@cartoon/components';
 import { createThreeAdapter } from '@cartoon/render-three';
 import { hashWorldState, migrate, type SceneDoc } from '@cartoon/schema';
-import scene01Json from '../../../scenes/scene-01.json';
-import testRobotJson from '../../../scenes/test-robot.json';
+// ?scene=<имя файла из scenes/ без .json> — какую сцену играть (по умолчанию scene-01)
+const scenes = import.meta.glob('../../../scenes/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
+const sceneName = new URLSearchParams(location.search).get('scene') ?? 'scene-01';
+const sceneJson = scenes[`../../../scenes/${sceneName}.json`];
+if (!sceneJson) throw new Error(`Нет сцены «${sceneName}» в scenes/`);
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 // ?scene=test-robot — тестовая сцена робота (3.1); по умолчанию «Сцена 01»
-const SCENES: Record<string, unknown> = { 'scene-01': scene01Json, 'test-robot': testRobotJson };
-const sceneJson = SCENES[new URLSearchParams(location.search).get('scene') ?? 'scene-01'] ?? scene01Json;
 const checked = validateAgainstRegistry(migrate(sceneJson), registry);
 if (!checked.ok) {
   document.body.innerHTML = `<div class="err">Сцена не прошла проверку:\n${checked.errors.join('\n')}</div>`;

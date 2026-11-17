@@ -5,6 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
+    "@cartoon/components": "workspace:*",
     "@cartoon/engine": "workspace:*",
     "@cartoon/schema": "workspace:*",
     "@dgreenheck/ez-tree": "1.1.0",
