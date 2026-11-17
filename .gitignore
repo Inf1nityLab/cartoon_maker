@@ -4,3 +4,4 @@ test-results
 playwright-report
 sources/_eval/
 *.tsbuildinfo
+e2e/report-*/
