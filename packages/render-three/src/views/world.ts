@@ -69,26 +69,63 @@ export const WaterView = defineView('Water', {
   dispose(mesh, three) { three.scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); },
 });
 
+type ForcesView = {
+  sunLight: { strength: number }; moonLight: { elevation: number; azimuth: number; strength: number };
+  cloudiness: number; fog: number;
+};
+const GREY = new THREE.Color('#9aa3ad'), FOG_GREY = new THREE.Color('#b8bec6'), SUN_LOW = new THREE.Color('#ff9a5a'), SUN_HIGH = new THREE.Color('#fff4e0'), MOON = new THREE.Color('#9db8ff');
+
+/**
+ * Небо, солнце и (если в мире есть Forces) луна, облачность и туман. Объекты three создаются один раз в mount и дальше
+ * меняются на месте (новый Fog или Color на каждый кадр пересобирал бы все шейдеры сцены, задача 1.8).
+ * Без Forces — прежний расчёт по высоте солнца, кадры старых сцен не меняются.
+ */
 export const SkyView = defineView('Sky', {
-  mount: () => ({}),
-  sync(_h, _self, three, state) {
+  mount: () => ({ bg: new THREE.Color(), key: new THREE.Color(), tmp: new THREE.Color(), grey: new THREE.Color() }),
+  sync(h, _self, three, state) {
     const { elevation, azimuth } = state.sun;
-    const sky = skyColor(elevation);
-    three.scene.background = sky;
-    // Туман создаём один раз и дальше меняем на месте: новый объект Fog на каждый кадр сбрасывает у three узел тумана,
-    // а с ним ключ кэша всех шейдеров сцены, и все материалы пересобираются заново на каждом кадре (задача 1.8).
-    if (three.scene.fog instanceof THREE.Fog) three.scene.fog.color.copy(sky);
-    else three.scene.fog = new THREE.Fog(sky, 60, 320);
-    const k = dayK(elevation), lv = sunLevels(elevation);
-    const d = sunVector(elevation, azimuth), target = state.camera.target;
+    const f = Object.values(state.world ?? {}).find((w) => w.type === 'Forces') as unknown as ForcesView | undefined;
+    h.bg.copy(skyColor(elevation));
+    if (f) h.bg.lerp(h.grey.copy(GREY).multiplyScalar(0.25 + 0.75 * Math.min(1, Math.max(0, elevation / 20 + 0.5))), f.cloudiness * 0.55);
+    three.scene.background = h.bg;
+    const fogColor = f ? h.tmp.copy(h.bg).lerp(h.grey.copy(FOG_GREY).multiplyScalar(0.25 + 0.75 * dayK(elevation + 10)), f.fog * 0.8) : h.bg;
+    // Туман создаём один раз и дальше меняем на месте.
+    if (three.scene.fog instanceof THREE.Fog) three.scene.fog.color.copy(fogColor);
+    else three.scene.fog = new THREE.Fog(fogColor, 60, 320);
+    const fog = three.scene.fog as THREE.Fog;
+    fog.near = f ? 60 * (1 - 0.9 * f.fog) : 60;
+    fog.far = f ? 320 * (1 - 0.85 * f.fog) : 320;
+    const target = state.camera.target;
+    let dir: [number, number, number], intensity: number, hemi: number, exposure: number;
+    if (f && f.moonLight.strength > f.sunLight.strength) {
+      // ночь: главный свет — луна (холодный, слабый); переключение там, где оба света почти нулевые, поэтому без скачка
+      dir = sunVector(f.moonLight.elevation, f.moonLight.azimuth);
+      h.key.copy(MOON);
+      intensity = 0.75 * f.moonLight.strength;
+      hemi = 0.24 + 0.3 * f.moonLight.strength;
+      exposure = 1.35;
+    } else if (f) {
+      const k = dayK(elevation), lv = sunLevels(elevation);
+      dir = sunVector(elevation, azimuth);
+      h.key.copy(SUN_LOW).lerp(SUN_HIGH, k);
+      const fade = Math.max(0, Math.min(1, (elevation + 1.5) / 3)); // солнце гаснет у горизонта: к -1.5° света нет
+      intensity = lv.sun * fade * (1 - 0.7 * f.cloudiness);
+      hemi = Math.max(0.5, lv.hemi * (0.35 + 0.65 * fade)) * (1 - 0.25 * f.cloudiness);
+      exposure = lv.exposure;
+    } else {
+      const k = dayK(elevation), lv = sunLevels(elevation);
+      dir = sunVector(elevation, azimuth);
+      h.key.copy(SUN_LOW).lerp(SUN_HIGH, k);
+      intensity = lv.sun; hemi = lv.hemi; exposure = lv.exposure;
+    }
     // направление света задают только эти две точки; каскады теней (light/sunShadow.ts) сами встают под камеру
     three.sunLight.target.position.set(target[0], target[1], target[2]);
-    three.sunLight.position.set(target[0] + d[0] * 80, target[1] + d[1] * 80, target[2] + d[2] * 80);
-    three.sunLight.color.set(lerpColor(new THREE.Color('#ff9a5a'), new THREE.Color('#fff4e0'), k));
-    three.sunLight.intensity = lv.sun;
-    three.hemi.intensity = lv.hemi;
-    three.hemi.color.copy(sky);
-    three.renderer.toneMappingExposure = lv.exposure;
+    three.sunLight.position.set(target[0] + dir[0] * 80, target[1] + dir[1] * 80, target[2] + dir[2] * 80);
+    three.sunLight.color.copy(h.key);
+    three.sunLight.intensity = intensity;
+    three.hemi.intensity = hemi;
+    three.hemi.color.copy(h.bg);
+    three.renderer.toneMappingExposure = exposure;
   },
   dispose() {},
 });

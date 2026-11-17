@@ -27,10 +27,13 @@ export type RobotSelf = {
   lookRef: Ref; yawCmd: number; pitchCmd: number; rollCmd: number;
   headYaw: number; headYawV: number; headPitch: number; headPitchV: number; headRoll: number; headRollV: number;
   // глаз
+  glare: number; // яркость света в лицо 0…1 (из сил мира)
   squint: number; squintTarget: number; squintUntil: number;
   blinkAt: number; blinkDur: number; lid: number; // lid — итоговое раскрытие века 0..1
   wide: number; wideTarget: number; wideUntil: number;
   startledUntil: number; startled: boolean;
+  // ручки облика и связей с силами мира
+  lightColor: string; windSensitivity: number; lightSensitivity: number;
   // луч
   scanOn: boolean; scan: number;
   // рука
@@ -42,6 +45,8 @@ const YAW_ACC = 10; // рад/с²: как быстро корпус набир�
 const IDLE_DECEL = 2; // м/с²: сама остановка без цели
 const JERK = 10; // м/с³: плавность ускорения (иначе наклон дёргается)
 const HEAD_W = 13; // рад/с: пружина головы
+const WIND_GAIN = 0.006; // рад изгиба антенны на (м/с)²
+const GLARE_FROM = 0.25, GLARE_SPAN = 0.5; // яркость в лицо, с которой начинается прищур и на которой он полный
 const LOOK_YAW = 1.9, LOOK_PITCH = 0.6; // пределы головы, рад
 
 const bearing = (from: Vec3, to: Vec3): number => Math.atan2(to[0] - from[0], to[2] - from[2]);
@@ -117,11 +122,29 @@ const Actions = {
 
 export const Robot = defineComponent<RobotParams, RobotSelf>({
   type: 'Robot',
-  version: 1,
-  describe: 'Колёсный робот-исследователь (семейство Biped не нужно: два колеса на оси). Катится, сам балансирует корпус, гибкая антенна, один большой глаз с веком и зрачком, рука с захватом, луч сканера.',
+  version: 2,
+  describe: 'Колёсный робот-исследователь (семейство Biped не нужно: два колеса на оси). Катится, сам балансирует корпус, гибкая антенна (качается от ветра), один большой глаз с веком и зрачком (щурится от яркого света в лицо), рука с захватом, луч сканера. Ручки: lightColor, windSensitivity, lightSensitivity. Слушает силы мира: ветер и свет.',
+  // v2: добавлены windSensitivity и lightSensitivity (со значениями по умолчанию); старые сцены читаются как есть
+  migrate: { 1: (p: Record<string, unknown>) => p },
+  handles: { lightColor: {}, windSensitivity: {}, lightSensitivity: {} },
   params: RobotParams,
   presets: ROBOT_PRESETS,
   actions: Actions,
+  showcase: {
+    kind: 'entity', size: 0.34, eye: 0.2, ground: 'flat',
+    demos: [{
+      title: 'Огни меняют цвет, ветер качает антенну, свет бьёт в глаз',
+      duration: 12,
+      steps: [
+        { t: 0.5, action: 'handle.to', args: { handle: 'lightColor', value: '#ff5a5a', over: 2.5, ease: 'ease-in-out' } },
+        { t: 3.5, action: 'handle.to', args: { handle: 'lightColor', value: '#59fff3', over: 2, ease: 'ease-in-out' } },
+        { t: 5, action: 'handle.set', args: { handle: 'windSensitivity', value: 2.5 } },
+        { t: 6, action: 'blink', args: {} },
+        { t: 8, action: 'look', args: { target: 'camera' } },
+        { t: 10, action: 'startle', args: { intensity: 0.8 } },
+      ],
+    }],
+  },
   create(ctx, p, spawn) {
     const d = robotDims(p), at = spawn!.at;
     const s: RobotSelf = {
@@ -132,8 +155,9 @@ export const Robot = defineComponent<RobotParams, RobotSelf>({
       speed: 0, acc: 0, yawRate: 0, dyn: newDyn(), pitch: 0, roll: 0,
       lookRef: null, yawCmd: 0, pitchCmd: 0, rollCmd: 0,
       headYaw: 0, headYawV: 0, headPitch: 0, headPitchV: 0, headRoll: 0, headRollV: 0,
-      squint: 1, squintTarget: 1, squintUntil: 0, blinkAt: -1, blinkDur: 0.22, lid: 1,
+      glare: 0, squint: 1, squintTarget: 1, squintUntil: 0, blinkAt: -1, blinkDur: 0.22, lid: 1,
       wide: 0, wideTarget: 0, wideUntil: 0, startledUntil: 0, startled: false,
+      lightColor: p.lightColor, windSensitivity: p.windSensitivity, lightSensitivity: p.lightSensitivity,
       scanOn: false, scan: 0,
       armMode: 'fold', armRef: null, armReach: 0, armRate: 1 / 0.9, armTarget: [at[0], 0, at[2]], grip: 0.3, gripTarget: 0.3,
     };
@@ -231,12 +255,20 @@ export const Robot = defineComponent<RobotParams, RobotSelf>({
     ground(s, ctx);
 
     // ---- наклон корпуса, антенна, колёса
-    stepDyn(s.dyn, { speed: s.speed, accel: s.acc, yawRate: s.yawRate, yawAcc: (s.yawRate - yawOld) / dt, headAcc: ha, wheelR: g.wheelR, halfTrack: g.halfTrack, headH: g.headH }, dt);
+    // ветер в точке антенны (6.6): в систему корпуса — вперёд и влево; сила ~ v·|v|, как у настоящего сопротивления
+    const wv = ctx.wind([s.pos[0], s.pos[1] + g.headH, s.pos[2]]);
+    const wFwd = wv[0] * Math.sin(hn) + wv[2] * Math.cos(hn), wLeft = wv[0] * Math.cos(hn) - wv[2] * Math.sin(hn);
+    stepDyn(s.dyn, { windF: WIND_GAIN * s.windSensitivity * wFwd * Math.abs(wFwd), windS: WIND_GAIN * s.windSensitivity * wLeft * Math.abs(wLeft), speed: s.speed, accel: s.acc, yawRate: s.yawRate, yawAcc: (s.yawRate - yawOld) / dt, headAcc: ha, wheelR: g.wheelR, halfTrack: g.halfTrack, headH: g.headH }, dt);
 
     // ---- глаз
     if (t >= s.squintUntil) s.squintTarget = 1;
     if (t >= s.wideUntil) s.wideTarget = 0;
-    s.squint = ease(s.squint, s.squintTarget, 14, dt);
+    // яркий свет в лицо (6.6): солнце спереди и над горизонтом → прищур, сила — по яркости в точке (облака и тень рельефа учтены)
+    const eyeP: Vec3 = [s.pos[0], s.pos[1] + g.headH, s.pos[2]], lt = ctx.light(eyeP);
+    const faceA = hn + s.headYaw, face: Vec3 = [Math.sin(faceA), 0, Math.cos(faceA)];
+    const glare = clamp((lt.sun * Math.max(0, face[0] * lt.sunDir[0] + face[2] * lt.sunDir[2]) - GLARE_FROM) / GLARE_SPAN, 0, 1) * s.lightSensitivity;
+    s.glare = glare;
+    s.squint = ease(s.squint, Math.min(s.squintTarget, 1 - 0.65 * glare), 14, dt);
     s.wide = ease(s.wide, s.wideTarget, 12, dt);
     if (s.blinkAt >= 0 && t - s.blinkAt >= s.blinkDur) s.blinkAt = -1;
     // веко: закрывается за первую треть, открывается к концу (форма как в песочнице)
@@ -267,7 +299,7 @@ export const Robot = defineComponent<RobotParams, RobotSelf>({
       tilt: s.dyn.tilt * DEG,
       groundPitch: s.pitch * DEG, groundRoll: s.roll * DEG,
       headYaw: s.headYaw * DEG, headPitch: s.headPitch * DEG, headRoll: s.headRoll * DEG,
-      eyeOpen: s.lid, eyeWide: s.wide, blinking: s.blinkAt >= 0,
+      eyeOpen: s.lid, ...(s.glare > 0 ? { glare: s.glare } : {}), eyeWide: s.wide, blinking: s.blinkAt >= 0,
       scan: s.scan, armReach: s.armReach, armTarget: [...s.armTarget], grip: s.grip,
       antenna: [s.dyn.antF * DEG, s.dyn.antS * DEG],
       wheels: [s.dyn.wheelL * DEG, s.dyn.wheelR * DEG],

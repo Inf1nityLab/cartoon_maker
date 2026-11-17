@@ -55,8 +55,8 @@ export function validateSceneDoc(raw: unknown): Result<SceneDoc> {
     evIds.add(ev.id);
     if (i > 0 && ev.t < doc.timeline[i - 1]!.t) errors.push(`timeline[${i}].t: таймлайн должен быть отсортирован по t (${ev.t} после ${doc.timeline[i - 1]!.t})`);
     if (ev.t > doc.settings.duration) errors.push(`timeline[${i}].t: ${ev.t} с — после конца сцены (${doc.settings.duration} с)`);
-    if (ev.target !== 'world' && ev.target !== 'camera' && !(ev.target in doc.entities)) {
-      errors.push(`timeline[${i}].target: нет сущности «${ev.target}». Есть: ${Object.keys(doc.entities).join(', ') || '—'}`);
+    if (ev.target !== 'world' && ev.target !== 'camera' && !(ev.target in doc.entities) && !doc.world.some((w) => w.id === ev.target)) {
+      errors.push(`timeline[${i}].target: нет сущности «${ev.target}» (и компонента мира с таким id). Есть: ${[...doc.world.map((w) => w.id), ...Object.keys(doc.entities)].join(', ') || '—'}`);
     }
   });
   return errors.length ? { ok: false, errors } : { ok: true, doc };

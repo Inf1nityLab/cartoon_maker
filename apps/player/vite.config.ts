@@ -25,5 +25,5 @@ export default defineConfig({
   optimizeDeps: { exclude: ['@dgreenheck/ez-tree'], include: ['three', 'three/tsl', 'three/webgpu', 'three/addons/controls/OrbitControls.js', 'three/addons/csm/CSMShadowNode.js', 'three/addons/utils/BufferGeometryUtils.js', 'meshoptimizer', 'zod'] }, // (dev-сервер не должен предсобирать ez-tree из npm-сборки мимо псевдонима)
   worker: { format: 'es', plugins: () => [ezTreeWithoutTextures()] },
   server: { fs: { allow: ['../..'] } },
-  build: { rolldownOptions: { input: { main: fileURLToPath(new URL('./index.html', import.meta.url)), nanite: fileURLToPath(new URL('./nanite.html', import.meta.url)) } } },
+  build: { rolldownOptions: { input: { main: fileURLToPath(new URL('./index.html', import.meta.url)), nanite: fileURLToPath(new URL('./nanite.html', import.meta.url)), library: fileURLToPath(new URL('./library.html', import.meta.url)) } } },
 });

@@ -124,7 +124,7 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
   }
 
   /** Применить шаги ручке компонента в момент t; дорожка заводится при первом касании. */
-  function applyHandle(id: string, name: string, steps: HandleStep[], t: number): void {
+  function applyHandle(id: string, name: string, steps: HandleStep[], t: number, direct = false): void {
     const info = infos[id]?.[name];
     if (!info) {
       const def = order.find((o) => o.id === id)?.def;
@@ -132,6 +132,7 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
     }
     const byId = (tracks[id] ??= {});
     byId[name] ??= { base: handleVals[id]![name]!, segs: [] };
+    if (direct) byId[name]!.direct = true;
     applySteps(byId[name]!, t, info.kind, steps);
   }
 
@@ -276,10 +277,10 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
     }
     if (e.action === 'handle.set') {
       const a = HandleSetArgs.parse(e.args);
-      applyHandle(o.id, a.handle, [{ to: a.value, over: 0 }], e.t);
+      applyHandle(o.id, a.handle, [{ to: a.value, over: 0 }], e.t, true);
     } else {
       const a = HandleToArgs.parse(e.args);
-      applyHandle(o.id, a.handle, [{ to: a.value, over: a.over, ease: a.ease }], e.t);
+      applyHandle(o.id, a.handle, [{ to: a.value, over: a.over, ease: a.ease }], e.t, true);
     }
   }
 
@@ -336,7 +337,10 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
   /** Значения ручек, которых коснулась режиссура, и отключённые связи. */
   function touched(): Pick<WorldState, 'handles' | 'unlinked'> {
     const handles: NonNullable<WorldState['handles']> = {};
-    for (const [id, byName] of Object.entries(tracks)) handles[id] = Object.fromEntries(Object.keys(byName).sort().map((n) => [n, handleVals[id]![n]!]));
+    for (const [id, byName] of Object.entries(tracks)) {
+      const names = Object.keys(byName).filter((n) => byName[n]!.direct).sort(); // поведения (gust, sun…) — дело компонента, в хэш не идут
+      if (names.length) handles[id] = Object.fromEntries(names.map((n) => [n, handleVals[id]![n]!]));
+    }
     return {
       ...(Object.keys(handles).length ? { handles } : {}),
       ...(Object.keys(unlinked).length ? { unlinked: structuredClone(unlinked) } : {}),

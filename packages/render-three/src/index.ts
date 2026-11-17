@@ -40,6 +40,11 @@ export interface RenderAdapter {
   shadowInfo(): CascadeInfo[];
   /** Следующий render() показывает момент, не следующий за прошлым (склейка, перемотка): история TAA сбрасывается и прогревается. */
   discontinuity(): void;
+  /**
+   * Пересобрать виды под новый документ без пересоздания рендерера (витрина объектов: смена пресета и облика).
+   * Набор компонентов с FilmLook-ом не должен меняться (проходы кадра выбираются при mount).
+   */
+  remount(doc: SceneDoc): void;
   dispose(): void;
 }
 
@@ -95,6 +100,15 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
         const view = views[inst.type];
         if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst) });
       }
+    },
+    remount(doc) {
+      for (const m of mounted) m.view.dispose(m.handle, three);
+      mounted.length = 0;
+      for (const inst of [...doc.world, ...Object.values(doc.entities)]) {
+        const view = views[inst.type];
+        if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst) });
+      }
+      lookId = [...doc.world, ...Object.values(doc.entities)].find((c) => c.type === 'FilmLook')?.id ?? null;
     },
     sync(state, snap) {
       for (const m of mounted) m.view.sync(m.handle, snap.components[m.id]!.self, three, state);

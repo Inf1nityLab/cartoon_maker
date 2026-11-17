@@ -89,6 +89,12 @@ export const Road = defineComponent({
   version: 1,
   describe: 'Дорога-брусчатка вдоль пути scene.paths[path]. Рельеф под ней мягко выравнивается (ctx.heightAt), обочина плавная. Объявлять после Terrain.',
   params: RoadParams,
+  presets: {
+    lane: RoadParams.parse({ path: 'road' }),
+    wide: RoadParams.parse({ path: 'road', width: 7, shoulder: 5, stone: 0.3 }),
+    footpath: RoadParams.parse({ path: 'road', width: 1.2, shoulder: 1.5, stone: 0.12 }),
+  },
+  showcase: { kind: 'world', size: 40, eye: 1, ground: 'hills' },
   actions: {},
   setup(ctx, p) {
     const model = buildRoad(ctx.path(p.path), p);

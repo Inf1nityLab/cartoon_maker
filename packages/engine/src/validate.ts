@@ -55,7 +55,7 @@ export function validateAgainstRegistry(raw: unknown, reg: Registry): { ok: true
       for (const [p, m] of checkHandleEvent(d, ev.action, ev.args)) errors.push(`${at}.args.${p}: ${m}`);
       return;
     }
-    const defs = ev.target === 'world' ? doc.world.map((w) => reg.components[w.type]).filter(Boolean) : [reg.components[typeOf[ev.target] ?? '']].filter(Boolean);
+    const defs = ev.target === 'world' ? doc.world.map((w) => reg.components[w.type]).filter(Boolean) : [reg.components[typeOf[ev.target] ?? doc.world.find((w) => w.id === ev.target)?.type ?? '']].filter(Boolean);
     const def = defs.find((d) => d && ev.action in d.actions);
     if (!def) {
       const all = defs.flatMap((d) => Object.keys(d!.actions));

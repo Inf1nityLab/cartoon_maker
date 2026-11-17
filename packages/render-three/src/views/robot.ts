@@ -9,7 +9,7 @@ const REST = { yaw: 0.0, a1: -0.95, beta: 2.55, wrist: 0 };
 const LIFT = 0.012; // м (единичных): покрышки стоят чуть над картой высот
 const ANT_REST = 0.07; // рад: собственный изгиб антенны на звено
 
-type Handle = { parts: Parts; look: Look; d: RobotDims; inv: THREE.Matrix4; tmp: THREE.Vector3; down: THREE.Vector3 };
+type Handle = { lightColor: string; parts: Parts; look: Look; d: RobotDims; inv: THREE.Matrix4; tmp: THREE.Vector3; down: THREE.Vector3 };
 
 const clamp = (v: number, a: number, b: number): number => Math.min(b, Math.max(a, v));
 const smooth = (x: number): number => { const t = clamp(x, 0, 1); return t * t * (3 - 2 * t); };
@@ -49,7 +49,7 @@ export const RobotView = defineView<Handle>('Robot', {
     const parts = buildRobot(look, d);
     parts.root.scale.setScalar(d.scale);
     three.scene.add(parts.root);
-    return { parts, look, d, inv: new THREE.Matrix4(), tmp: new THREE.Vector3(), down: new THREE.Vector3() };
+    return { lightColor: params.lightColor, parts, look, d, inv: new THREE.Matrix4(), tmp: new THREE.Vector3(), down: new THREE.Vector3() };
   },
   sync(h, s: RobotSelf, _three, state) {
     const p = h.parts, dyn = s.dyn, k = h.d.scale;
@@ -67,6 +67,7 @@ export const RobotView = defineView<Handle>('Robot', {
     const u = h.look.u;
     u.open.value = s.lid; u.wide.value = s.wide; u.glow.value = 1 + 0.5 * s.wide;
     u.scan.value = s.scan;
+    if (s.lightColor !== h.lightColor) { u.light.value.set(s.lightColor); h.lightColor = s.lightColor; }
     u.ground.value = p.root.position.y - LIFT * k;
     u.t.value = state.t;
     p.beam.visible = s.scan > 0.01;

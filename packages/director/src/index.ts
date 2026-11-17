@@ -1,12 +1,40 @@
-import type { SceneDoc, Target, TimelineEvent, Vec3 } from '@cartoon/schema';
+import type { HandleValue, SceneDoc, Target, TimelineEvent, Vec3 } from '@cartoon/schema';
+
+export { generateDirectorDts } from './dts.ts';
 
 /** Ручка сущности: любой метод превращается в команду для таймлайна. В документ идут только данные. */
 const HANDLE = Symbol('handle');
 export type Command = { target: string; action: string; args: Record<string, unknown> };
-export type EntityHandle = { readonly id: string; [action: string]: any };
+export type EaseName = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'step';
+export type ForceName = 'wind' | 'light' | 'temperature';
+/**
+ * Ручка компонента (мир или сущность). Любой метод — действие компонента; четыре метода общие для всех (6.7, 6.6):
+ *   set(ручка, значение)                  — сразу, с момента команды;
+ *   to(ручка, значение, { over, ease })   — по кривой за over секунд;
+ *   unlink(сила) / link(сила)             — перебивка: объект перестаёт/начинает слушать ветер, свет, температуру.
+ * Поведения (глаголы) — обычные действия компонента: forces.gust({ strength: 9 }), sky.sun({ … }).
+ * Время задаётся снаружи, как у всех команд: `s.at(30).do(sky.to('time', 19.5, { over: 40 }))`. Это в духе раздела 8:
+ * «когда» и «что» отдельно, команда — значение, её можно собрать в настроение и повторить.
+ */
+export type EntityHandle = {
+  readonly id: string;
+  set(handle: string, value: HandleValue): Command;
+  to(handle: string, value: HandleValue, opts?: { over?: number; ease?: EaseName }): Command;
+  link(force: ForceName): Command;
+  unlink(force: ForceName): Command;
+  [action: string]: any;
+};
 
 function handle(id: string): EntityHandle {
-  return new Proxy({ id, [HANDLE]: true } as EntityHandle, {
+  const own = {
+    id,
+    set: (name: string, value: HandleValue): Command => ({ target: id, action: 'handle.set', args: { handle: name, value } }),
+    to: (name: string, value: HandleValue, opts: { over?: number; ease?: EaseName } = {}): Command => ({ target: id, action: 'handle.to', args: { handle: name, value, over: opts.over ?? 1, ease: opts.ease ?? 'ease-in-out' } }),
+    link: (force: ForceName): Command => ({ target: id, action: 'link.set', args: { force, on: true } }),
+    unlink: (force: ForceName): Command => ({ target: id, action: 'link.set', args: { force, on: false } }),
+    [HANDLE]: true,
+  };
+  return new Proxy(own as unknown as EntityHandle, {
     get(t, prop) {
       if (prop in t) return (t as any)[prop];
       if (typeof prop !== 'string') return undefined;
@@ -27,10 +55,13 @@ type ShotName = 'establishing' | 'follow' | 'lowAngle' | 'orbit' | 'closeup' | '
 export type Director = {
   places(p: Record<string, Vec3>): void;
   path(id: string, p: { points: Vec3[]; closed?: boolean }): void;
-  world: { use(type: string, params?: Record<string, unknown>): void; sun(a: Sun): void; look(a: Record<string, unknown>): void; lookPreset(name: string): void };
+  world: { use(type: string, params?: Record<string, unknown>): EntityHandle; sun(a: Sun): void; look(a: Record<string, unknown>): void; lookPreset(name: string): void };
   add(type: string, params?: Record<string, unknown>, spawn?: { at: Target; heading?: number; id?: string }): EntityHandle;
+  /** Настроение: именованный набор изменений ручек разных объектов (команды set/to/link). Применить: s.at(t).mood(name). */
+  mood(name: string, changes: Command[]): void;
   at(t: number): {
     do(...cmds: Command[]): void;
+    mood(name: string): void;
     camera: { shot(name: ShotName, args?: Record<string, unknown>): void; focus(a?: Focus): void };
     world: { sun(a: Sun): void; look(a: Record<string, unknown>): void; lookPreset(name: string): void };
   };
@@ -55,11 +86,23 @@ export function buildScene(fn: (s: Director) => void, meta: SceneMeta): SceneDoc
     lookPreset: (name: string) => push(t, { target: 'world', action: 'lookPreset', args: { name } }),
   });
 
+  const moods: Record<string, Command[]> = {};
+  const MOOD_ACTIONS = ['handle.set', 'handle.to', 'link.set'];
+
   const s: Director = {
+    mood(name, changes) {
+      const bad = changes.find((c) => !MOOD_ACTIONS.includes(c.action));
+      if (bad) throw new Error(`Настроение «${name}»: можно только set, to, link, unlink; получено «${bad.action}» у «${bad.target}»`);
+      moods[name] = changes;
+    },
     places: (p) => void Object.assign(doc.places, p),
     path: (id, p) => void (doc.paths[id] = { points: p.points, closed: p.closed ?? false }),
     world: {
-      use(type, params = {}) { doc.world.push({ id: type.toLowerCase(), type, version: 1, params }); },
+      use(type, params = {}) {
+        const id = type.toLowerCase();
+        doc.world.push({ id, type, version: 1, params });
+        return handle(id);
+      },
       sun: worldApi(0).sun,
       look: worldApi(0).look,
       lookPreset: worldApi(0).lookPreset,
@@ -71,6 +114,11 @@ export function buildScene(fn: (s: Director) => void, meta: SceneMeta): SceneDoc
     },
     at: (t) => ({
       do: (...cmds) => cmds.forEach((c) => push(t, c)),
+      mood(name) {
+        const m = moods[name];
+        if (!m) throw new Error(`Нет настроения «${name}». Есть: ${Object.keys(moods).join(', ') || '—'}`);
+        for (const c of m) push(t, c.action === 'link.set' ? c : { ...c, args: { ...c.args, mood: name } });
+      },
       camera: {
         shot: (name, args = {}) => push(t, { target: 'camera', action: 'shot', args: plain({ name, ...args }) }),
         focus: (a = {}) => push(t, { target: 'camera', action: 'focus', args: { ...a } }),

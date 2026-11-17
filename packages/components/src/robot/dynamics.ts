@@ -29,6 +29,8 @@ export type DynInput = {
   yawRate: number; yawAcc: number; // рад/с, рад/с² (поворот корпуса)
   headAcc: number; // рад/с² (поворот головы относительно корпуса)
   wheelR: number; halfTrack: number; headH: number; // м, в реальных размерах
+  /** Ветер на антенну в системе корпуса, рад: вперёд и влево (0 без ветра). */
+  windF?: number; windS?: number;
 };
 
 /** Один шаг динамики на dt. */
@@ -40,13 +42,13 @@ export function stepDyn(c: Dyn, i: DynInput, dt: number): void {
   // ускорение основания антенны в системе робота: корпус, голова на наклоне, центростремительное и касательное
   const aF = i.accel + i.headH * ta;
   const aS = i.speed * i.yawRate + 0.05 * clamp(i.yawAcc + i.headAcc, -60, 60);
-  const spring = (v: number, vel: number, a: number): [number, number] => {
-    const acc = ANT_W * ANT_W * (-ANT_GAIN * a - v) - 2 * ANT_ZETA * ANT_W * vel;
+  const spring = (v: number, vel: number, a: number, wind: number): [number, number] => {
+    const acc = ANT_W * ANT_W * (-ANT_GAIN * a + wind - v) - 2 * ANT_ZETA * ANT_W * vel;
     const nv = vel + acc * dt;
     return [clamp(v + nv * dt, -0.9, 0.9), nv];
   };
-  [c.antF, c.fv] = spring(c.antF, c.fv, aF);
-  [c.antS, c.sv] = spring(c.antS, c.sv, aS);
+  [c.antF, c.fv] = spring(c.antF, c.fv, aF, i.windF ?? 0);
+  [c.antS, c.sv] = spring(c.antS, c.sv, aS, i.windS ?? 0);
   // левый поворот: левое колесо медленнее
   c.wheelL += ((i.speed - i.yawRate * i.halfTrack) / i.wheelR) * dt;
   c.wheelR += ((i.speed + i.yawRate * i.halfTrack) / i.wheelR) * dt;

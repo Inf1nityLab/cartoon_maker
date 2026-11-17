@@ -53,6 +53,7 @@ export type HandleInfo = {
   integer?: boolean;
   options?: string[];
   default?: HandleValue;
+  boolean?: true;
   schema: ZodType;
 };
 
@@ -60,6 +61,35 @@ type DefLike = { params: ZodType; handles?: Record<string, HandleDef> };
 const cache = new WeakMap<object, Record<string, HandleInfo>>();
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const big = (x: unknown): x is number => typeof x === 'number' && Math.abs(x) < 1e15;
+
+function describe(name: string, schema: ZodType, h?: HandleDef): HandleInfo {
+  let js: Record<string, unknown> = {};
+  try { js = z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>; } catch { /* схема без JSON-вида: скачком */ }
+  const type = js.type;
+  const isColor = type === 'string' && typeof js.pattern === 'string' && js.pattern === HEX.source;
+  const kind: HandleKind = type === 'number' || type === 'integer' ? 'number' : isColor ? 'color' : 'step';
+  return {
+    name, kind, unit: h?.unit ?? '', describe: h?.describe ?? (typeof js.description === 'string' ? js.description : ''),
+    ...(big(js.minimum) ? { min: js.minimum } : {}), ...(big(js.maximum) ? { max: js.maximum } : {}),
+    ...(type === 'integer' ? { integer: true } : {}),
+    ...(Array.isArray(js.enum) ? { options: js.enum.map(String) } : {}),
+    ...(js.default !== undefined ? { default: js.default as HandleValue } : {}),
+    ...(type === 'boolean' ? { boolean: true } : {}),
+    schema,
+  };
+}
+
+/** Все поля params (витрина объектов строит по ним ползунки): ручки и обычные параметры. Вложенные объекты и кортежи не включаются. */
+export function paramFields(def: DefLike): (HandleInfo & { handle: boolean })[] {
+  const shape = (def.params as unknown as { shape?: Record<string, ZodType> }).shape ?? {};
+  const handles = handleInfos(def);
+  return Object.entries(shape).flatMap(([name, schema]) => {
+    const h = handles[name];
+    const info = h ?? describe(name, schema);
+    const plain = info.kind !== 'step' || info.options || info.boolean;
+    return plain ? [{ ...info, handle: !!h }] : [];
+  });
+}
 
 /** Ручки компонента с описанием из схемы. Для компонента без ручек — пусто. */
 export function handleInfos(def: DefLike): Record<string, HandleInfo> {
@@ -70,19 +100,7 @@ export function handleInfos(def: DefLike): Record<string, HandleInfo> {
   for (const [name, h] of Object.entries(def.handles ?? {})) {
     const schema = h.schema ?? shape[name];
     if (!schema) throw new Error(`Ручка «${name}»: нет поля в схеме params и не задан schema`);
-    let js: Record<string, unknown> = {};
-    try { js = z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>; } catch { /* схема без JSON-вида: ручка скачком */ }
-    const type = js.type;
-    const isColor = type === 'string' && typeof js.pattern === 'string' && js.pattern === HEX.source;
-    const kind: HandleKind = type === 'number' || type === 'integer' ? 'number' : isColor ? 'color' : 'step';
-    out[name] = {
-      name, kind, unit: h.unit ?? '', describe: h.describe ?? (typeof js.description === 'string' ? js.description : ''),
-      ...(big(js.minimum) ? { min: js.minimum } : {}), ...(big(js.maximum) ? { max: js.maximum } : {}),
-      ...(type === 'integer' ? { integer: true } : {}),
-      ...(Array.isArray(js.enum) ? { options: js.enum.map(String) } : {}),
-      ...(js.default !== undefined ? { default: js.default as HandleValue } : {}),
-      schema,
-    };
+    out[name] = describe(name, schema, h);
   }
   cache.set(def, out);
   return out;
@@ -93,7 +111,7 @@ export function handleInfos(def: DefLike): Record<string, HandleInfo> {
 /** Отрезок кривой: с t0 за dur секунд от from к to. dur 0 — скачок в t0. */
 export type Seg = { t0: number; dur: number; from: HandleValue; to: HandleValue; ease: Ease };
 /** base — значение до первого отрезка. Только JSON: входит в чекпоинты. */
-export type Track = { base: HandleValue; segs: Seg[] };
+export type Track = { base: HandleValue; segs: Seg[]; /** касалась команда режиссёра (set/to), а не только поведение: такие ручки входят в WorldState */ direct?: true };
 /** Шаг кривой: к значению `to` за `over` секунд. */
 export type HandleStep = { to: HandleValue; over?: number; ease?: Ease };
 

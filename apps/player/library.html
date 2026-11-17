@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Витрина объектов</title>
+  </head>
+  <body>
+    <div id="lib">
+      <header id="top">
+        <b id="title">Витрина</b>
+        <select id="object" title="Объект"></select>
+        <span class="sep"></span>
+        <div id="forces"><span class="lbl">Силы мира</span></div>
+        <button id="gust" title="Порыв ветра сейчас (Forces.gust)">порыв</button>
+      </header>
+      <aside id="left">
+        <h3>Пресеты</h3>
+        <div id="presets"></div>
+        <h3>Облик</h3>
+        <div id="params"></div>
+      </aside>
+      <div id="stage"><canvas id="view"></canvas><div id="views"></div><div id="msg"></div></div>
+      <aside id="right">
+        <h3>Ручки <small>(меняются во времени)</small></h3>
+        <div id="handles"></div>
+        <h3>Демо</h3>
+        <div id="demos"></div>
+        <h3>Состояние</h3>
+        <pre id="state"></pre>
+      </aside>
+      <footer>
+        <button id="play" title="Пауза / играть">⏸</button>
+        <button id="restart" title="Сначала">⏮</button>
+        <input id="t" type="range" min="0" max="30" step="0.01" value="0" />
+        <span id="time"></span>
+        <label><input type="checkbox" id="free" checked /> облёт мышью</label>
+        <button id="snap" class="wide" title="Сохранить кадр в PNG">снимок</button>
+      </footer>
+    </div>
+    <script type="module" src="/src/library.ts"></script>
+  </body>
+</html>

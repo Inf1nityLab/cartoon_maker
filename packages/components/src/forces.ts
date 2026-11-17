@@ -23,7 +23,7 @@ const dirOf = (elevation: number, azimuth: number): Vec3 => {
 };
 
 export const ForcesParams = z.object({
-  time: z.number().min(0).max(24).default(12).describe('время суток, часы (0–24; 6 — восход, 12 — полдень, 18 — закат, 0 — полночь)'),
+  time: z.number().min(0).max(24).default(12).describe('время суток, часы (0–24; 5 — восход, 12 — полдень, 19 — закат, 0 — полночь)'),
   sunArc: z.number().min(10).max(90).default(62).describe('наибольшая высота солнца в полдень, ° (меньше — севернее или зимой)'),
   windDirection: z.number().min(0).max(360).default(90).describe('куда дует ветер, ° (0 — на север, +z; 90 — на восток, +x)'),
   windStrength: z.number().min(0).max(30).default(2).describe('сила ветра, м/с (2 — лёгкий, 8 — свежий, 15 — шторм)'),
@@ -36,9 +36,14 @@ export const ForcesParams = z.object({
 });
 export type ForcesParams = z.infer<typeof ForcesParams>;
 
-/** Высота и азимут солнца по часам. Восход в 6:00 на востоке (90°), полдень на юге (180°), закат в 18:00 на западе (270°). */
+/**
+ * Высота и азимут солнца по часам. Восход в 5:00 на востоке (90°), полдень в 12:00 на юге (180°, высота = arc),
+ * закат в 19:00 на западе (270°); ночью солнце под горизонтом (до 0.8·arc), проходит через север в 0:00.
+ */
 export function sunAt(time: number, arc: number): { elevation: number; azimuth: number } {
-  return { elevation: arc * Math.sin(((time - 6) / 24) * 2 * Math.PI), azimuth: wrap360(90 + 15 * (time - 6)) };
+  if (time >= 5 && time < 19) return { elevation: arc * Math.sin(((time - 5) / 14) * Math.PI), azimuth: wrap360(90 + (180 * (time - 5)) / 14) };
+  const u = time >= 19 ? time - 19 : time + 5; // часы с заката, 0…10
+  return { elevation: -arc * 0.8 * Math.sin((u / 10) * Math.PI) + 0, azimuth: wrap360(270 + 18 * u) };
 }
 
 /** Сила прямого солнца 0…1 по его высоте (до облаков и теней): с горизонта до 30° нарастает, дальше — полная. */
@@ -120,8 +125,8 @@ export const Forces = defineComponent({
         const moonEl = -s.elevation;
         return {
           time: v('time'),
-          sun: { elevation: s.elevation, azimuth: s.azimuth, strength: sunStrength(s.elevation) * (1 - 0.78 * cloud) },
-          moon: { elevation: moonEl, azimuth: wrap360(s.azimuth + 180), strength: moonStrength(moonEl, v('moonPhase')) * (1 - 0.7 * cloud), phase: v('moonPhase') },
+          sunLight: { elevation: s.elevation, azimuth: s.azimuth, strength: sunStrength(s.elevation) * (1 - 0.78 * cloud) },
+          moonLight: { elevation: moonEl, azimuth: wrap360(s.azimuth + 180), strength: moonStrength(moonEl, v('moonPhase')) * (1 - 0.7 * cloud), phase: v('moonPhase') },
           stars: clamp((-s.elevation - 4) / 10, 0, 1) * (1 - 0.8 * cloud),
           wind: { direction: v('windDirection'), strength: v('windStrength'), speed: Math.hypot(w[0], w[2]), gust: v('gustBoost') },
           cloudiness: cloud,
@@ -142,7 +147,7 @@ export const Forces = defineComponent({
         break;
       case 'calm': ctx.handles.to('windStrength', 0, { over: a.over, ease: 'ease-in-out' }); ctx.handles.to('gustiness', 0, { over: a.over, ease: 'ease-in-out' }); break;
       case 'sunset': ctx.handles.to('time', 19.5, { over: a.over, ease: 'ease-in-out' }); break;
-      case 'sunrise': ctx.handles.to('time', 6.5, { over: a.over, ease: 'ease-in-out' }); break;
+      case 'sunrise': ctx.handles.to('time', 5.5, { over: a.over, ease: 'ease-in-out' }); break;
     }
   },
   state: (_s, ctx) => {

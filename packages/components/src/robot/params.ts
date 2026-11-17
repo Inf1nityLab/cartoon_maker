@@ -13,12 +13,18 @@ export const RobotParams = z.object({
   wheelDiameter: z.number().min(0.5).max(1.8).default(1).describe('диаметр колёс, множитель'),
   bodyColor: Hex.default('#fffaf1').describe('цвет корпуса (пластик)'),
   lightColor: Hex.default('#59fff3').describe('цвет огней: глаз, кольца, антенна, луч'),
+  windSensitivity: z.number().min(0).max(3).default(1).describe('чувствительность антенны к ветру: 0 не качается, 1 как есть, 3 флюгер'),
+  lightSensitivity: z.number().min(0).max(1).default(0.8).describe('насколько глаз щурится от яркого света в лицо: 0 не щурится'),
 });
 export type RobotParams = z.infer<typeof RobotParams>;
 
 /** Пресеты облика. `explorer` — утверждённый владельцем «Исследователь» (песочница, последний круг правок). */
 export const ROBOT_PRESETS: Record<string, RobotParams> = {
   explorer: RobotParams.parse({}),
+  /** Разведчик: мелкий, большая голова, тёплые огни, чувствительный к ветру. */
+  scout: RobotParams.parse({ height: 0.24, bodyWidth: 0.8, bodyHeight: 0.85, headSize: 1.25, wheelDiameter: 1.2, bodyColor: '#f4d9a8', lightColor: '#ffb14a', windSensitivity: 1.6 }),
+  /** Грузчик: крупный, широкий, на больших колёсах, зелёные огни, почти не боится ветра. */
+  hauler: RobotParams.parse({ height: 0.5, bodyWidth: 1.4, bodyHeight: 1.3, headSize: 0.8, wheelDiameter: 1.5, bodyColor: '#c9d6df', lightColor: '#7dff6a', windSensitivity: 0.4 }),
 };
 
 /**

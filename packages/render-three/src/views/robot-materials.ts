@@ -12,7 +12,7 @@ export type Look = {
   plastic: THREE.Material; rubber: THREE.Material; metal: THREE.Material; glow: THREE.Material; eye: THREE.Material;
   cup: THREE.Material; dome: THREE.Material; beam: THREE.Material; halo: THREE.Material; shine: THREE.Material; blob: THREE.Material;
   /** Униформы, которые вид выставляет каждый кадр. */
-  u: { open: { value: number }; wide: { value: number }; glow: { value: number }; scan: { value: number }; ground: { value: number }; t: { value: number } };
+  u: { open: { value: number }; wide: { value: number }; glow: { value: number }; scan: { value: number }; ground: { value: number }; t: { value: number }; light: { value: THREE.Color } };
   dispose(): void;
 };
 
@@ -20,11 +20,12 @@ export type Look = {
 const TEAL_REF = new THREE.Color('#59fff3');
 
 export function createLook(p: { bodyColor: string; lightColor: string }): Look {
-  const u = { open: uniform(1), wide: uniform(0), glow: uniform(1), scan: uniform(0), ground: uniform(0), t: uniform(0) };
-  const body = new THREE.Color(p.bodyColor), light = new THREE.Color(p.lightColor);
-  const TEAL = vec3(light.r, light.g, light.b);
+  const u = { open: uniform(1), wide: uniform(0), glow: uniform(1), scan: uniform(0), ground: uniform(0), t: uniform(0), light: uniform(new THREE.Color(p.lightColor)) };
+  const body = new THREE.Color(p.bodyColor);
+  // цвет огней — униформа: ручка lightColor (6.7) меняет его по кадрам без пересборки шейдеров
+  const TEAL = vec3(u.light as unknown as import('three/webgpu').Node<'vec3'>);
   // радужка в утверждённом облике рассчитана на TEAL_REF; для другого цвета огней — те же градиенты, умноженные на отношение цветов
-  const tint = vec3(light.r / Math.max(TEAL_REF.r, 1e-3), light.g / Math.max(TEAL_REF.g, 1e-3), light.b / Math.max(TEAL_REF.b, 1e-3));
+  const tint = TEAL.div(vec3(Math.max(TEAL_REF.r, 1e-3), Math.max(TEAL_REF.g, 1e-3), Math.max(TEAL_REF.b, 1e-3)));
 
   const plastic = new THREE.MeshStandardNodeMaterial({ color: body, roughness: 0.34, metalness: 0 });
   plastic.emissiveNode = vec3(body.r, body.g, body.b).mul(0.045); // подсветка: в тени леса белый пластик уходил в серый

@@ -1,1 +1,13 @@
-{ "name": "@cartoon/director", "private": true, "version": "0.0.0", "type": "module", "main": "src/index.ts", "dependencies": { "@cartoon/schema": "workspace:*" } }
+{
+  "name": "@cartoon/director",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@cartoon/schema": "workspace:*",
+    "@cartoon/engine": "workspace:*",
+    "@cartoon/components": "workspace:*",
+    "zod": "^4.1.0"
+  }
+}
