@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { coldShot, warmShots, type Shot } from './capture.ts';
-import { chromium } from '@playwright/test';
-import { ARGS, BASE } from './capture.ts';
 import { diff, MAX_CHANNEL, MAX_SHARE } from './pixels.ts';
 
 // Задача 1.4: земля и дорога. Кадры для глаз — в test-results/1.4-keep (в .gitignore; Playwright чистит test-results
@@ -55,25 +53,5 @@ test.describe('дорога test-road', () => {
     writeFileSync(`${OUT}/series-flicker.json`, JSON.stringify({ bands, ticks: TICKS.slice(1), meanAbsLumaDiffFromFrame0: res, ratio_D1_over_D16: ratio }, null, 2));
     expect(eyes.concat(tiny).every((s) => s.errors.length === 0)).toBe(true);
     for (const [name, r] of Object.entries(ratio)) expect(r, `${name}: D(1)/D(16) = ${r.toFixed(2)}; D по сдвигам: ${res[name]!.map((x) => x.toFixed(2)).join(' ')}`).toBeLessThan(MAX_RATIO);
-  });
-
-  test('GPU-время кадра (замер, не ворота)', async () => {
-    const browser = await chromium.launch({ channel: 'chrome', args: ARGS });
-    try {
-      const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
-      await page.goto(`${BASE}${ROAD}&gpu=1`);
-      await page.waitForFunction(() => (window as unknown as { __player?: unknown }).__player);
-      const res: Record<string, (number | null)[]> = {};
-      for (const [name, t] of [['ground', 0], ['side', 10], ['top', 20]] as const) {
-        const ms: (number | null)[] = [];
-        for (let k = 0; k < 3; k++) {
-          await page.evaluate(`window.__player.show(${t}, ${Math.max(0, t - DT)})`);
-          ms.push(await page.evaluate('window.__player.gpuMs()') as number | null);
-        }
-        res[name] = ms;
-      }
-      mkdirSync(OUT, { recursive: true });
-      writeFileSync(`${OUT}/gpu-ms.json`, JSON.stringify(res, null, 2));
-    } finally { await browser.close(); }
   });
 });
