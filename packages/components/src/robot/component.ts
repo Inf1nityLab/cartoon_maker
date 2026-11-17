@@ -46,7 +46,7 @@ const IDLE_DECEL = 2; // м/с²: сама остановка без цели
 const JERK = 10; // м/с³: плавность ускорения (иначе наклон дёргается)
 const HEAD_W = 13; // рад/с: пружина головы
 const WIND_GAIN = 0.006; // рад изгиба антенны на (м/с)²
-const GLARE_FROM = 0.25, GLARE_SPAN = 0.5; // яркость в лицо, с которой начинается прищур и на которой он полный
+const GLARE_FROM = 0.2, GLARE_TO = 0.65; // косинус угла между взглядом и солнцем: с него прищур начинается, на нём — полный
 const LOOK_YAW = 1.9, LOOK_PITCH = 0.6; // пределы головы, рад
 
 const bearing = (from: Vec3, to: Vec3): number => Math.atan2(to[0] - from[0], to[2] - from[2]);
@@ -266,9 +266,10 @@ export const Robot = defineComponent<RobotParams, RobotSelf>({
     // яркий свет в лицо (6.6): солнце спереди и над горизонтом → прищур, сила — по яркости в точке (облака и тень рельефа учтены)
     const eyeP: Vec3 = [s.pos[0], s.pos[1] + g.headH, s.pos[2]], lt = ctx.light(eyeP);
     const faceA = hn + s.headYaw, face: Vec3 = [Math.sin(faceA), 0, Math.cos(faceA)];
-    const glare = clamp((lt.sun * Math.max(0, face[0] * lt.sunDir[0] + face[2] * lt.sunDir[2]) - GLARE_FROM) / GLARE_SPAN, 0, 1) * s.lightSensitivity;
+    const toSun = face[0] * lt.sunDir[0] + face[2] * lt.sunDir[2];
+    const glare = smooth(GLARE_FROM, GLARE_TO, toSun) * Math.min(1, lt.sun * 1.1) * s.lightSensitivity;
     s.glare = glare;
-    s.squint = ease(s.squint, Math.min(s.squintTarget, 1 - 0.65 * glare), 14, dt);
+    s.squint = ease(s.squint, Math.min(s.squintTarget, 1 - 0.75 * glare), 14, dt);
     s.wide = ease(s.wide, s.wideTarget, 12, dt);
     if (s.blinkAt >= 0 && t - s.blinkAt >= s.blinkDur) s.blinkAt = -1;
     // веко: закрывается за первую треть, открывается к концу (форма как в песочнице)

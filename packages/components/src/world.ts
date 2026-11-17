@@ -51,7 +51,7 @@ export const Terrain = defineComponent({
     bowl: TerrainParams.parse({ amplitude: 14, scale: 0.05, lake: { at: [0, 0], radius: 45, depth: 18 } }),
     soft: TerrainParams.parse({ amplitude: 3, scale: 0.012 }),
   },
-  showcase: { kind: 'world', size: 120, eye: 4, ground: 'hills' },
+  showcase: { kind: 'world', size: 60, eye: 3, ground: 'hills' },
   actions: {},
   migrate: {
     // v1: меш 192 клетки с граненой раскраской, heightAt считалась отдельно от меша. v2: тот же вид и та же сетка

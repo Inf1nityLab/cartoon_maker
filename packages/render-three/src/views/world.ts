@@ -110,7 +110,8 @@ export const SkyView = defineView('Sky', {
       h.key.copy(SUN_LOW).lerp(SUN_HIGH, k);
       const fade = Math.max(0, Math.min(1, (elevation + 1.5) / 3)); // солнце гаснет у горизонта: к -1.5° света нет
       intensity = lv.sun * fade * (1 - 0.7 * f.cloudiness);
-      hemi = Math.max(0.5, lv.hemi * (0.35 + 0.65 * fade)) * (1 - 0.25 * f.cloudiness);
+      const dusk = 1 - Math.min(1, Math.abs(elevation - 1) / 8); // закат и рассвет: небо светит сильнее прямого света
+      hemi = Math.max(0.5 + 0.4 * dusk, lv.hemi * (0.35 + 0.65 * fade)) * (1 - 0.25 * f.cloudiness);
       exposure = lv.exposure;
     } else {
       const k = dayK(elevation), lv = sunLevels(elevation);

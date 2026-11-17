@@ -62,13 +62,14 @@ const VIEWS: Record<string, string> = { general: 'общий', close: 'круп�
 function viewShot(name: string): { at: Vec3; look: Vec3; fov: number } {
   // объект меняет размер вместе с параметром height (если он есть): камера держит его в кадре
   const k = typeof params.height === 'number' && typeof defaultsOf.height === 'number' ? Math.max(0.3, params.height / defaultsOf.height) : 1;
+  const far = show.kind === 'world' ? 0.4 : 1; // объекты мира снимаются ближе, относительно их размера
   const size = show.size * k, eye = (show.eye ?? show.size / 2) * k, a = (-35 * Math.PI) / 180;
   const at = (dist: number, h: number): Vec3 => [Math.sin(a) * dist, h, -Math.cos(a) * dist];
   switch (name) {
-    case 'close': return { at: at(size * 2.5, eye * 1.2), look: [0, eye * 1.05, 0], fov: 36 };
-    case 'ground': return { at: at(size * 3.2, Math.max(size * 0.06, 0.04)), look: [0, eye, 0], fov: 55 };
-    case 'top': return { at: [0, size * 5, -size * 0.6], look: [0, 0, 0], fov: 45 };
-    default: return { at: at(size * 5, size * 1.1), look: [0, eye, 0], fov: 45 };
+    case 'close': return { at: at(size * 2.5 * far, eye * 1.2), look: [0, eye * 1.05, 0], fov: 36 };
+    case 'ground': return { at: at(size * 3.2 * far, Math.max(size * 0.06, 0.04)), look: [0, eye, 0], fov: 55 };
+    case 'top': return { at: [0, size * 5 * far, -size * 0.6 * far], look: [0, 0, 0], fov: 45 };
+    default: return { at: at(size * 5 * far, size * 1.1 * far), look: [0, eye, 0], fov: 45 };
   }
 }
 
@@ -80,7 +81,7 @@ function build(): SceneDoc {
     if (hills) s.world.use('Water', {});
     if (objectName === 'Sky') s.world.use('Sky', params);
     else { s.world.use('Sky', {}); s.world.use('Forces', objectName === 'Forces' ? params : forcesParams); }
-    if (objectName === 'Road') { s.path('road', { points: [[-45, 0, -45], [-12, 0, -10], [8, 0, 6], [45, 0, 44]] }); s.world.use('Road', params); }
+    if (objectName === 'Road') { s.path('road', { points: [[-45, 0, -22], [-14, 0, -6], [10, 0, 3], [45, 0, 30]] }); s.world.use('Road', params); }
     else if (show.kind === 'world' && !['Terrain', 'Sky', 'Forces'].includes(objectName)) s.world.use(objectName, params);
     if (show.kind === 'entity') { s.places({ center: [0, 0, 0] }); s.add(objectName, params, { at: 'center', heading: 175, id: objId }); }
     const v = viewShot(viewName);

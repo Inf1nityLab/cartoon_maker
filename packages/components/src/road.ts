@@ -94,7 +94,7 @@ export const Road = defineComponent({
     wide: RoadParams.parse({ path: 'road', width: 7, shoulder: 5, stone: 0.3 }),
     footpath: RoadParams.parse({ path: 'road', width: 1.2, shoulder: 1.5, stone: 0.12 }),
   },
-  showcase: { kind: 'world', size: 40, eye: 1, ground: 'hills' },
+  showcase: { kind: 'world', size: 10, eye: 0.5, ground: 'hills' },
   actions: {},
   setup(ctx, p) {
     const model = buildRoad(ctx.path(p.path), p);

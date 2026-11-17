@@ -56,9 +56,9 @@ test.describe('витрина объектов (Б0)', () => {
     await shot('filmlook-warm', 'object=FilmLook&preset=warm-evening&view=close&time=17');
   });
 
-  test('ошибочный объект: страница сообщает, а не падает молча', async () => {
-    const s = await coldShot('/library.html?object=Nope', 0).catch((e: Error) => e);
-    expect(String(s)).toBeTruthy();
+  test('ошибочный объект: страница сообщает, а не падает молча', async ({ page }) => {
+    await page.goto('/library.html?object=Nope');
+    await expect(page.locator('body')).toContainText('Нет объекта «Nope». Есть:');
   });
 
   test('два холодных запуска кадра витрины: хэш равен, пиксели в допуске', async () => {
@@ -71,5 +71,65 @@ test.describe('витрина объектов (Б0)', () => {
     expect(a.hash).toBe(b.hash);
     expect(d.differing, `пикселей отличается: ${d.differing} из ${d.total}`).toBeLessThanOrEqual(Math.floor(d.total * MAX_SHARE));
     expect(d.maxChannelDiff).toBeLessThanOrEqual(MAX_CHANNEL);
+  });
+});
+
+test.describe('витрина объектов: интерфейс (Б0)', () => {
+  test.setTimeout(180_000);
+
+  test('кнопки пресетов, ползунки из схемы, силы мира, порыв, демо, виды, снимок — без ошибок консоли', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    await page.setViewportSize({ width: 1500, height: 880 });
+    await page.goto('/library.html?backend=webgl2&object=Robot&time=11');
+    await page.waitForFunction(() => (window as unknown as { __player?: unknown }).__player);
+    const state = () => page.evaluate(() => (window as unknown as { __player: { state(): any } }).__player.state());
+    // пресеты и подсказки у ползунков (единицы и описание из схемы)
+    expect(await page.locator('#presets button').allTextContents()).toEqual(['explorer', 'scout', 'hauler']);
+    expect(await page.locator('#params .row:has(#f-height)').getAttribute('title')).toMatch(/рост до макушки головы, м[\s\S]*диапазон 0.1 … 3/);
+    expect(await page.locator('#handles .row').count()).toBe(3); // lightColor, windSensitivity, lightSensitivity
+    await page.getByRole('button', { name: 'scout' }).click();
+    await page.waitForTimeout(400);
+    expect(Number(await page.locator('#f-height').inputValue())).toBeCloseTo(0.24, 1);
+    // ползунок облика
+    await page.locator('#f-height').evaluate((el: HTMLInputElement) => { el.value = '0.5'; el.dispatchEvent(new Event('input')); });
+    await page.waitForTimeout(400);
+    expect(await page.locator('#f-height-out').textContent()).toMatch(/^0\.(49|5\d)$/);
+    // силы мира сверху: время суток двигает солнце
+    const before = (await state()).sun.elevation;
+    await page.locator('#force-time').evaluate((el: HTMLInputElement) => { el.value = '8'; el.dispatchEvent(new Event('input')); });
+    await page.waitForTimeout(400);
+    expect((await state()).sun.elevation).not.toBeCloseTo(before, 1);
+    expect(await page.locator('#f-time-out').textContent()).toBe('08:00');
+    // порыв ветра и демо
+    await page.locator('#gust').click();
+    await page.waitForTimeout(600);
+    expect((await state()).world.forces.wind.gust).toBeGreaterThan(0);
+    await page.getByRole('button', { name: /▶ Огни меняют цвет/ }).click();
+    await page.waitForTimeout(800);
+    // виды камеры
+    for (const v of ['крупно', 'у земли', 'сверху', 'общий']) { await page.getByRole('button', { name: v, exact: true }).click(); await page.waitForTimeout(300); }
+    // снимок: скачивается PNG
+    const dl = page.waitForEvent('download');
+    await page.locator('#snap').click();
+    const file = await dl;
+    expect(file.suggestedFilename()).toMatch(/\.png$/);
+    mkdirSync(OUT, { recursive: true });
+    await page.screenshot({ path: `${OUT}/library-ui-robot.png` });
+    expect(errors).toEqual([]);
+  });
+
+  test('страница для остальных объектов открывается без ошибок: Terrain, Road, Sky, Forces, FilmLook', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    for (const o of ['Terrain', 'Road', 'Sky', 'Forces', 'FilmLook']) {
+      await page.goto(`/library.html?backend=webgl2&object=${o}`);
+      await page.waitForFunction(() => (window as unknown as { __player?: unknown }).__player);
+      await page.waitForTimeout(500);
+      expect(await page.locator('#title').textContent()).toBe(`Витрина: ${o}`);
+    }
+    await page.screenshot({ path: `${OUT}/library-ui-filmlook.png` });
+    expect(errors).toEqual([]);
   });
 });
