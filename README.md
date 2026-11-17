@@ -26,6 +26,8 @@ pnpm нужен 12-й (`npm i -g pnpm`). Команды:
 | `pnpm licenses:check` | только разрешённые лицензии (MIT, ISC, BSD, Apache-2.0, Zlib, MPL-2.0, CC0, CC-BY-4.0) |
 | `pnpm scenes` | пересобрать scenes/*.json из кода режиссёра |
 
+CI: GitHub Actions (`.github/workflows/ci.yml`) на каждый push и PR гоняет install --frozen-lockfile, lint, typecheck, test, licenses:check. `pnpm e2e` в CI не входит (нужна видеокарта с WebGPU) — гоняется локально.
+
 Рендер: `WebGPURenderer` с откатом на WebGL2; для скриншот-тестов принудительно WebGL2 (`?backend=webgl2`). Сторонний код: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Не сделано из этапа 0: Forest, Rocks, Dust и точный перенос рельефа/воды/паука из `reference/scene-01-reference.js` (файла нет). Свет «Сцены 01» и вид приближены.
