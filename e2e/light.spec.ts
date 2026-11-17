@@ -55,6 +55,7 @@ test.describe('солнце и тени', () => {
     for (const sec of [3, 16, 29]) { // общий план, низкая точка, крупный план (fov разный)
       const s = await coldShot(`${FILM}&probe=hero`, sec, sec - DT);
       const texels = s.shadow.map((c) => c.texel);
+      mkdirSync(OUT, { recursive: true }); // не зависим от того, что соседний тест уже создал папку
       writeFileSync(`${OUT}/shadow-cascades-t${sec}.json`, JSON.stringify(s.shadow, null, 2));
       expect(texels[0]!, `t=${sec}: тексел первого каскада, м`).toBeLessThanOrEqual(0.05);
       expect(texels[1]!, `t=${sec}: тексел второго каскада, м`).toBeLessThanOrEqual(0.06);

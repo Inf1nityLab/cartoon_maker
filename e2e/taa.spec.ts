@@ -1,5 +1,6 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { openPlayer } from './capture.ts';
 import { diff, MAX_CHANNEL, MAX_SHARE } from './pixels.ts';
 
 // Задача 1.2: TAA с векторами движения, прогрев после перемотки, режим накопления (?accum=N).
@@ -25,8 +26,7 @@ async function open(query: string) {
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(BASE + query);
-  await page.waitForFunction(() => (window as unknown as { __player?: Player }).__player);
+  await openPlayer(page, query);
   const px = async (action: string) => Buffer.from(await page.evaluate(grab(action)) as string, 'base64');
   return { page, px, errors, close: () => browser.close() };
 }

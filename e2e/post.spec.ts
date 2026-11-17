@@ -1,7 +1,7 @@
 import { chromium, expect, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { diff, MAX_CHANNEL, MAX_SHARE } from './pixels.ts';
-import { ARGS, BASE, type Player } from './capture.ts';
+import { ARGS, BASE, openPlayer, type Player } from './capture.ts';
 
 // Задача 1.7: пост-эффекты кино (глубина резкости, цвет, виньетка, рамки 2.39:1 и 9:16, лучи солнца).
 // Кадры и числа — в e2e/report-1.7 (не в git; копии для отчёта — test-results/1.7-keep). swiftshader, как в остальных спеках.
@@ -22,8 +22,7 @@ async function open(query: string) {
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(BASE + query);
-  await page.waitForFunction(() => (window as unknown as { __player?: Player }).__player);
+  await openPlayer(page, query);
   const px = async (action: string) => Buffer.from(await page.evaluate(grab(action)) as string, 'base64');
   return { page, px, errors, close: () => browser.close() };
 }

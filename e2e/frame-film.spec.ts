@@ -1,5 +1,6 @@
 import { chromium, expect, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { openPlayer } from './capture.ts';
 import { diff, MAX_CHANNEL, MAX_SHARE } from './pixels.ts';
 
 // Задача 1.1: режим «фильм» и выход движения. Кадры складываем в e2e/report-1.1 (не в snapshots).
@@ -26,8 +27,7 @@ async function coldRun(query: string, sec: number, prev?: number) {
     const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto(BASE + query);
-    await page.waitForFunction(() => (window as unknown as { __player?: Player }).__player);
+    await openPlayer(page, query);
     const r = await page.evaluate(shot(sec, prev)) as { hash: string; w: number; h: number; px: string };
     const png = await page.locator('#view').screenshot();
     return { ...r, px: Buffer.from(r.px, 'base64'), png, errors };
@@ -60,8 +60,7 @@ test.describe('режим film', () => {
     const browser = await chromium.launch({ channel: 'chrome', args: ARGS });
     try {
       const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
-      await page.goto(BASE + FILM);
-      await page.waitForFunction(() => (window as unknown as { __player?: Player }).__player);
+      await openPlayer(page, FILM);
       await page.evaluate(shot(5));
       const r = await page.evaluate(shot(32, 32 - DT)) as { px: string };
       const d = diff(direct.px, Buffer.from(r.px, 'base64'), W);
