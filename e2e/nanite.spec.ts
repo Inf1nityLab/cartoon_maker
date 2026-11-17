@@ -1,5 +1,6 @@
 import { chromium, expect, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { diff as pixelDiff, MAX_CHANNEL, MAX_SHARE } from './pixels.ts';
 
 // Часть B: nanite-lib на нашем three 0.187.0. Нужен настоящий WebGPU (не swiftshader): свои флаги запуска.
 const ARGS = ['--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-webgpu', '--enable-features=WebGPU'];
@@ -35,21 +36,12 @@ async function coldRun(query: string): Promise<Run> {
   } finally { await browser.close(); }
 }
 
-const diff = (a: Buffer, b: Buffer) => {
-  let n = 0, max = 0;
-  const where: { x: number; y: number; a: number[]; b: number[] }[] = [];
-  for (let i = 0; i < a.length; i += 4) {
-    const d = Math.max(Math.abs(a[i]! - b[i]!), Math.abs(a[i + 1]! - b[i + 1]!), Math.abs(a[i + 2]! - b[i + 2]!), Math.abs(a[i + 3]! - b[i + 3]!));
-    if (d) { n++; if (d > max) max = d; if (where.length < 5) where.push({ x: (i / 4) % W, y: Math.floor(i / 4 / W), a: [...a.subarray(i, i + 4)], b: [...b.subarray(i, i + 4)] }); }
-  }
-  return { differing: n, total: a.length / 4, maxChannelDiff: max, firstDifferences: where };
-};
+const diff = (a: Buffer, b: Buffer) => pixelDiff(a, b, W);
 
 test.describe('nanite-lib на three 0.187.0', () => {
   test.setTimeout(240_000);
   // Допуск двух холодных запусков (решение владельца): не больше 0.01% пикселей и не больше 2/255 по каналу.
   // GPU порядок atomicAdd в списках кластеров не фиксирует, побитового равенства кадров не требуем.
-  const MAX_SHARE = 0.0001, MAX_CHANNEL = 2;
   // fixed — режим страницы по умолчанию (prepass и list-guard выключены); live — они в режимах автора (auto). Occlusion выключен в обоих.
   for (const [name, query] of [['fixed', ''], ['live', 'live=1']] as const) {
     test(`${name}: показ и два холодных старта`, async () => {

@@ -4,10 +4,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { SimSnapshot } from '@cartoon/engine';
 import type { SceneDoc, WorldState } from '@cartoon/schema';
 import type { ThreeCtx, ViewDef, ViewRegistry } from './view.ts';
+import { resolveFrame, type FrameOptions } from './film.ts';
+import { createFramePipeline, type DebugView } from './frame/pipeline.ts';
 import { MultipedView } from './views/multiped.ts';
 import { SkyView, TerrainView, WaterView } from './views/world.ts';
 
 export * from './view.ts';
+export type { FrameMode, FrameOptions } from './film.ts';
+export type { DebugView } from './frame/pipeline.ts';
 
 /** Единственное место, где живёт Three.js. Наружу не выходит ни один его объект. */
 export interface RenderAdapter {
@@ -17,6 +21,8 @@ export interface RenderAdapter {
   capture(): Promise<ImageBitmap>;
   /** Свободная камера для просмотра: не влияет на документ и на экспорт. */
   setFreeCamera(on: boolean): void;
+  /** Отладочный вид вместо кадра: 'motion' — векторы движения цветом. null — обычный кадр. */
+  setDebugView(v: DebugView): void;
   dispose(): void;
 }
 
@@ -26,8 +32,11 @@ export const defaultViews: ViewRegistry = Object.fromEntries([TerrainView, Water
  * backend: 'auto' — WebGPU, при его отсутствии WebGL2 (откат делает сам three).
  * 'webgl2' — принудительно WebGL2: скриншот-тесты и серверный рендер.
  */
-export function createThreeAdapter(opts: { views?: ViewRegistry; pixelRatio?: number; backend?: 'auto' | 'webgl2' } = {}): RenderAdapter {
+export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto' | 'webgl2' } & FrameOptions = {}): RenderAdapter {
   const views = opts.views ?? defaultViews;
+  const frame = resolveFrame(opts);
+  let pipeline!: ReturnType<typeof createFramePipeline>;
+  let debugView: DebugView = null;
   let canvas!: HTMLCanvasElement | OffscreenCanvas;
   let three!: ThreeCtx;
   let camera!: THREE.PerspectiveCamera;
@@ -39,9 +48,11 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; pixelRatio?: nu
   return {
     async mount(c, doc, sim) {
       canvas = c;
-      const renderer = new WebGPURenderer({ canvas: c as HTMLCanvasElement, antialias: true, forceWebGL: opts.backend === 'webgl2' });
+      const renderer = new WebGPURenderer({ canvas: c as HTMLCanvasElement, antialias: false, forceWebGL: opts.backend === 'webgl2' });
       await renderer.init();
-      renderer.setPixelRatio(opts.pixelRatio ?? 1);
+      renderer.setPixelRatio(frame.pixelRatio);
+      pipeline = createFramePipeline(renderer, { samples: frame.samples });
+      pipeline.setDebug(debugView);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoftShadowMap удалён в текущей версии three
@@ -69,13 +80,16 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; pixelRatio?: nu
         camera.fov = state.camera.fov;
       }
     },
-    render({ w, h }) {
+    render(requested) {
+      const { w, h } = frame.size(requested); // film: всегда filmSize, окно и экран не влияют
       three.renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       controls?.update();
-      three.renderer.render(three.scene, camera);
+      const px = frame.pixels({ w, h });
+      pipeline.render(three.scene, camera, px);
     },
+    setDebugView(v) { debugView = v; pipeline?.setDebug(v); },
     capture: () => createImageBitmap(canvas as HTMLCanvasElement),
     setFreeCamera(on) {
       free = on;
@@ -86,6 +100,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; pixelRatio?: nu
       controls?.dispose();
       for (const m of mounted) m.view.dispose(m.handle, three);
       mounted.length = 0;
+      pipeline.dispose();
       three.renderer.dispose();
     },
   };

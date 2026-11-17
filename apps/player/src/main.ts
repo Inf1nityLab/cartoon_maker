@@ -17,14 +17,25 @@ const doc: SceneDoc = checked.doc;
 const engine = createEngine({ registry });
 engine.load(doc);
 // ?backend=webgl2 — принудительно WebGL2 (скриншот-тесты); иначе WebGPU с откатом
-const backend = new URLSearchParams(location.search).get('backend') === 'webgl2' ? 'webgl2' : 'auto';
-const adapter = createThreeAdapter({ backend });
+const params = new URLSearchParams(location.search);
+const backend = params.get('backend') === 'webgl2' ? 'webgl2' : 'auto';
+// ?film=1 — режим «фильм»: размер и pixelRatio фиксированы (?w=&h=, по умолчанию 1280x720, pixelRatio 1), время идёт
+// только по кадрам (1/fps за кадр, ?fps=30), настенные часы не читаются. Без него — предпросмотр.
+const film = params.get('film') === '1';
+const filmSize = { w: Number(params.get('w') ?? 1280), h: Number(params.get('h') ?? 720) };
+const FPS = Number(params.get('fps') ?? 30);
+const adapter = createThreeAdapter(film ? { backend, mode: 'film', filmSize, pixelRatio: 1 } : { backend });
+// ?debug=motion — векторы движения цветом вместо кадра
+const debug = params.get('debug');
+adapter.setDebugView(debug === 'motion' ? 'motion' : null);
 const canvas = $<HTMLCanvasElement>('view');
 await adapter.mount(canvas, doc, () => engine.sim());
 
 const ASPECT = { '16:9': 16 / 9, '9:16': 9 / 16, '1:1': 1 } as const;
 let aspect: keyof typeof ASPECT = doc.settings.aspect;
-let t = 0, playing = true;
+// В режиме film плеер стоит на паузе: кадры рисуются только по команде (кнопка ▶, ползунок, __player.show).
+let t = 0, playing = !film;
+if (film) $('play').textContent = '▶';
 // Часы живут только здесь, в приложении: логика движка времени не знает.
 let last = performance.now();
 
@@ -73,7 +84,7 @@ function draw() {
 function frame() {
   const n = performance.now();
   if (playing) {
-    t += (n - last) / 1000;
+    t += film ? 1 / FPS : (n - last) / 1000;
     if (t > doc.settings.duration) t = 0;
     draw();
   }
@@ -83,6 +94,13 @@ function frame() {
 
 // для e2e-тестов: детерминированный кадр на заданной секунде
 (window as unknown as { __player: unknown }).__player = {
-  show(sec: number) { playing = false; t = sec; draw(); return hashWorldState(engine.state()); },
+  // prev — секунда, которую рисуем перед sec: от неё считаются векторы движения (кадр до sec)
+  show(sec: number, prev?: number) {
+    playing = false;
+    if (prev !== undefined) { t = prev; draw(); }
+    t = sec; draw();
+    return hashWorldState(engine.state());
+  },
 };
+if (film) draw(); // пауза: первый кадр рисуем сразу
 frame();
