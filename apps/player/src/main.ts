@@ -157,6 +157,8 @@ function frame() {
   // ?gpu=1: GPU-время последнего кадра, мс (замеры; в обычной работе не нужен)
   gpuMs: () => adapter.gpuMs(),
   shadowInfo: () => adapter.shadowInfo(),
+  // сколько узловых шейдеров three построил с запуска (e2e/shaders.spec.ts: после прогрева не растёт)
+  shaderBuilds: () => adapter.shaderBuilds(),
   // играет кадры from, from+1/fps, … до to по одному (первый — перемотка, остальные следуют друг за другом)
   play(from: number, to: number) {
     playing = false;

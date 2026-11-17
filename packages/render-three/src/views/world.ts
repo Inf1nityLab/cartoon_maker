@@ -75,7 +75,10 @@ export const SkyView = defineView('Sky', {
     const { elevation, azimuth } = state.sun;
     const sky = skyColor(elevation);
     three.scene.background = sky;
-    three.scene.fog = new THREE.Fog(sky, 60, 320);
+    // Туман создаём один раз и дальше меняем на месте: новый объект Fog на каждый кадр сбрасывает у three узел тумана,
+    // а с ним ключ кэша всех шейдеров сцены, и все материалы пересобираются заново на каждом кадре (задача 1.8).
+    if (three.scene.fog instanceof THREE.Fog) three.scene.fog.color.copy(sky);
+    else three.scene.fog = new THREE.Fog(sky, 60, 320);
     const k = dayK(elevation), lv = sunLevels(elevation);
     const d = sunVector(elevation, azimuth), target = state.camera.target;
     // направление света задают только эти две точки; каскады теней (light/sunShadow.ts) сами встают под камеру

@@ -32,6 +32,8 @@ export interface RenderAdapter {
   setDebugView(v: DebugView): void;
   /** Замер GPU-времени последнего render(), мс (нужен trackGpu; null — браузер не умеет). Только для замеров. */
   gpuMs(): Promise<number | null>;
+  /** Сколько раз three строил узловой шейдер (NodeBuilder) с запуска. Растёт только на новых материалах, не на кадрах; только для проверок. */
+  shaderBuilds(): number;
   /** Пробный объект для проверки теней (тест, не данные сцены). null — убрать. */
   setProbe(p: ProbeOptions | null): void;
   /** Каскады теней солнца: до какого расстояния, размер карты и тексела (м), смещения. */
@@ -63,6 +65,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
   let lastTarget: [number, number, number] = [0, 0, 0];
   let lookId: string | null = null; // компонент FilmLook сцены (вид плёнки)
   let post: PostFrame | null = null;
+  let shaderBuilds = 0;
   const mounted: { handle: unknown; view: ViewDef; id: string }[] = [];
 
   return {
@@ -70,6 +73,8 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       canvas = c;
       const renderer = new WebGPURenderer({ canvas: c as HTMLCanvasElement, antialias: false, forceWebGL: opts.backend === 'webgl2', trackTimestamp: opts.trackGpu === true });
       await renderer.init();
+      // счёт построений узловых шейдеров: после прогрева в установившемся режиме не должно быть ни одного (задача 1.8)
+      renderer.debug.onNodeBuilderCreated = () => { shaderBuilds++; };
       renderer.setPixelRatio(frame.pixelRatio);
       lookId = [...doc.world, ...Object.values(doc.entities)].find((c) => c.type === 'FilmLook')?.id ?? null;
       pipeline = createFramePipeline(renderer, { samples: frame.samples, aa: frame.aa, post: frame.fx, rays: frame.fx && lookId !== null });
@@ -121,6 +126,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       const ms = three.renderer.info.render.timestamp;
       return ms > 0 ? ms : null;
     },
+    shaderBuilds: () => shaderBuilds,
     setProbe(p) { probeOpts = p; probe?.set(p); },
     shadowInfo: () => sunShadow.info().map((c) => ({ ...c })),
     setDebugView(v) { debugView = v; pipeline?.setDebug(v); },
