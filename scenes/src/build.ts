@@ -1,8 +1,10 @@
 import { writeFileSync } from 'node:fs';
 import { scene01 } from './scene-01.ts';
+import { testRobot } from './test-robot.ts';
 
 // Собирает эталонные JSON из кода режиссёра: pnpm --filter @cartoon/scenes build
 writeFileSync(new URL('../scene-01.json', import.meta.url), JSON.stringify(scene01, null, 2) + '\n');
+writeFileSync(new URL('../test-robot.json', import.meta.url), JSON.stringify(testRobot, null, 2) + '\n');
 const film = {
   schema: 'film@1', id: 'film-01', title: 'Фильм 01',
   bible: { logline: 'Механический паук идёт через долину на закате.', characters: [{ id: 'spider', name: 'Паук', family: 'Multiped', params: { color: '#ff5a1f' }, description: 'Оранжевый механический паук' }], world: 'Холмы, лес, озеро на закате.', style: 'lowpoly' },

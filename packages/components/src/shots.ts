@@ -6,6 +6,10 @@ const Common = z.object({
   target: Target,
   side: z.enum(['left', 'right']).default('right'),
   fov: z.number().min(10).max(110).optional(),
+  /** Высота точки, куда смотрит камера, над точкой цели, м. Без неё — как раньше (под рост 1–2 м; для мелких героев задают). */
+  aim: z.number().min(0).max(30).optional(),
+  /** Минимальная высота камеры над землёй, м (по умолчанию 0.6; для мелких героев задают меньше). */
+  clearance: z.number().min(0.02).max(5).optional(),
 });
 
 /** Точка и курс цели; курс — только у сущностей. */
@@ -21,7 +25,7 @@ const dir = (heading: number): { fwd: Vec3; right: Vec3 } => {
   return { fwd, right: [fwd[2], 0, -fwd[0]] };
 };
 /** Камера не уходит под землю. */
-const clamp = (ctx: Ctx, pos: Vec3): Vec3 => [pos[0], Math.max(pos[1], ctx.heightAt(pos[0], pos[2]) + 0.6), pos[2]];
+const clamp = (ctx: Ctx, pos: Vec3, min = 0.6): Vec3 => [pos[0], Math.max(pos[1], ctx.heightAt(pos[0], pos[2]) + min), pos[2]];
 const ease = (t: number) => { const k = Math.max(0, Math.min(1, t)); return k * k * (3 - 2 * k); };
 
 export const Establishing = defineShot({
@@ -44,8 +48,8 @@ export const Follow = defineShot({
   solve(a, ctx) {
     const { p, heading } = focus(ctx, a.target), { fwd, right } = dir(heading);
     const side = a.side === 'left' ? -1 : 1;
-    const pos = clamp(ctx, [p[0] - fwd[0] * a.distance + right[0] * side * a.distance * 0.45, p[1] + a.height, p[2] - fwd[2] * a.distance + right[2] * side * a.distance * 0.45]);
-    return { pos, target: [p[0], p[1] + 1, p[2]], fov: a.fov ?? 55 };
+    const pos = clamp(ctx, [p[0] - fwd[0] * a.distance + right[0] * side * a.distance * 0.45, p[1] + a.height, p[2] - fwd[2] * a.distance + right[2] * side * a.distance * 0.45], a.clearance);
+    return { pos, target: [p[0], p[1] + (a.aim ?? 1), p[2]], fov: a.fov ?? 55 };
   },
   examples: ["s.at(7).camera.shot('follow', { target: spider, side: 'left' })"],
 });
@@ -70,8 +74,8 @@ export const Orbit = defineShot({
   solve(a, ctx, t) {
     const { p } = focus(ctx, a.target);
     const ang = ((a.speed * t + (a.side === 'left' ? 180 : 0)) * Math.PI) / 180;
-    const pos = clamp(ctx, [p[0] + Math.sin(ang) * a.distance, p[1] + a.height, p[2] + Math.cos(ang) * a.distance]);
-    return { pos, target: [p[0], p[1] + 1, p[2]], fov: a.fov ?? 50 };
+    const pos = clamp(ctx, [p[0] + Math.sin(ang) * a.distance, p[1] + a.height, p[2] + Math.cos(ang) * a.distance], a.clearance);
+    return { pos, target: [p[0], p[1] + (a.aim ?? 1), p[2]], fov: a.fov ?? 50 };
   },
   examples: ["s.at(20).camera.shot('orbit', { target: spider, speed: 20 })"],
 });
@@ -83,8 +87,8 @@ export const Closeup = defineShot({
   solve(a, ctx) {
     const { p, heading } = focus(ctx, a.target), { fwd, right } = dir(heading);
     const side = a.side === 'left' ? -1 : 1;
-    const h = a.on === 'eyes' ? 1.6 : 1.3;
-    const pos = clamp(ctx, [p[0] + fwd[0] * a.distance + right[0] * side * a.distance * 0.35, p[1] + h, p[2] + fwd[2] * a.distance + right[2] * side * a.distance * 0.35]);
+    const h = a.aim ?? (a.on === 'eyes' ? 1.6 : 1.3);
+    const pos = clamp(ctx, [p[0] + fwd[0] * a.distance + right[0] * side * a.distance * 0.35, p[1] + h, p[2] + fwd[2] * a.distance + right[2] * side * a.distance * 0.35], a.clearance);
     return { pos, target: [p[0], p[1] + h * 0.9, p[2]], fov: a.fov ?? 32 };
   },
   examples: ["s.at(29).camera.shot('closeup', { target: spider, on: 'eyes' })"],

@@ -1,0 +1,325 @@
+{
+  "schema": "scene@1",
+  "id": "test-robot",
+  "title": "Тест: робот-исследователь",
+  "settings": {
+    "fps": 60,
+    "duration": 17,
+    "seed": 31,
+    "aspect": "16:9"
+  },
+  "world": [
+    {
+      "id": "terrain",
+      "type": "Terrain",
+      "version": 1,
+      "params": {
+        "style": "flat"
+      }
+    },
+    {
+      "id": "water",
+      "type": "Water",
+      "version": 1,
+      "params": {}
+    },
+    {
+      "id": "sky",
+      "type": "Sky",
+      "version": 1,
+      "params": {
+        "elevation": 30,
+        "azimuth": 60
+      }
+    }
+  ],
+  "entities": {
+    "robot": {
+      "id": "robot",
+      "type": "Robot",
+      "version": 1,
+      "params": {},
+      "spawn": {
+        "at": "start",
+        "heading": 90
+      }
+    }
+  },
+  "places": {
+    "start": [
+      -1.5,
+      0,
+      0
+    ],
+    "stop": [
+      1.8,
+      0,
+      0
+    ]
+  },
+  "paths": {},
+  "camera": {
+    "shots": {}
+  },
+  "timeline": [
+    {
+      "id": "e1",
+      "t": 0,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "closeup",
+        "target": "robot",
+        "distance": 1.1,
+        "side": "right",
+        "fov": 38,
+        "aim": 0.2,
+        "clearance": 0.05,
+        "height": 0.22
+      }
+    },
+    {
+      "id": "e2",
+      "t": 0.7,
+      "target": "robot",
+      "action": "blink",
+      "args": {}
+    },
+    {
+      "id": "e3",
+      "t": 0.9,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "orbit",
+        "target": "robot",
+        "side": "right",
+        "speed": 0,
+        "distance": 1.1,
+        "aim": 0.2,
+        "clearance": 0.05,
+        "height": 0.22,
+        "fov": 28
+      }
+    },
+    {
+      "id": "e4",
+      "t": 1.5,
+      "target": "robot",
+      "action": "roll",
+      "args": {
+        "to": "stop",
+        "speed": 1,
+        "accel": 1.2,
+        "decel": 1.5
+      }
+    },
+    {
+      "id": "e5",
+      "t": 1.5,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "follow",
+        "target": "robot",
+        "side": "right",
+        "distance": 1.3,
+        "aim": 0.2,
+        "clearance": 0.05,
+        "height": 0.22,
+        "fov": 34
+      }
+    },
+    {
+      "id": "e6",
+      "t": 3.2,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "orbit",
+        "target": "robot",
+        "side": "right",
+        "speed": 0,
+        "distance": 1.1,
+        "aim": 0.2,
+        "clearance": 0.05,
+        "height": 0.22,
+        "fov": 28
+      }
+    },
+    {
+      "id": "e7",
+      "t": 5.8,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "closeup",
+        "target": "robot",
+        "on": "eyes",
+        "distance": 0.6,
+        "side": "right",
+        "fov": 32,
+        "aim": 0.27,
+        "clearance": 0.05
+      }
+    },
+    {
+      "id": "e8",
+      "t": 5.9,
+      "target": "robot",
+      "action": "look",
+      "args": {
+        "target": [
+          1.8,
+          0.25,
+          -1
+        ]
+      }
+    },
+    {
+      "id": "e9",
+      "t": 6.8,
+      "target": "robot",
+      "action": "look",
+      "args": {
+        "target": [
+          1.8,
+          0.25,
+          1
+        ]
+      }
+    },
+    {
+      "id": "e10",
+      "t": 7.6,
+      "target": "robot",
+      "action": "look",
+      "args": {
+        "target": null
+      }
+    },
+    {
+      "id": "e11",
+      "t": 7.95,
+      "target": "robot",
+      "action": "blink",
+      "args": {}
+    },
+    {
+      "id": "e12",
+      "t": 8.5,
+      "target": "robot",
+      "action": "squint",
+      "args": {
+        "amount": 0.35,
+        "hold": 0.6
+      }
+    },
+    {
+      "id": "e13",
+      "t": 9.3,
+      "target": "robot",
+      "action": "wide",
+      "args": {
+        "amount": 1,
+        "hold": 0.7
+      }
+    },
+    {
+      "id": "e14",
+      "t": 9.9,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "orbit",
+        "target": "robot",
+        "side": "left",
+        "speed": 0,
+        "distance": 1,
+        "aim": 0.2,
+        "clearance": 0.05,
+        "height": 0.22,
+        "fov": 28
+      }
+    },
+    {
+      "id": "e15",
+      "t": 10,
+      "target": "robot",
+      "action": "reach",
+      "args": {}
+    },
+    {
+      "id": "e16",
+      "t": 11.7,
+      "target": "robot",
+      "action": "reach",
+      "args": {
+        "to": null
+      }
+    },
+    {
+      "id": "e17",
+      "t": 12.1,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "orbit",
+        "target": "robot",
+        "side": "right",
+        "speed": 0,
+        "distance": 1.1,
+        "aim": 0.2,
+        "clearance": 0.05,
+        "height": 0.22,
+        "fov": 28
+      }
+    },
+    {
+      "id": "e18",
+      "t": 12.2,
+      "target": "robot",
+      "action": "scan",
+      "args": {
+        "on": true
+      }
+    },
+    {
+      "id": "e19",
+      "t": 13.7,
+      "target": "robot",
+      "action": "scan",
+      "args": {
+        "on": false
+      }
+    },
+    {
+      "id": "e20",
+      "t": 13.9,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "orbit",
+        "target": "robot",
+        "side": "right",
+        "speed": 22,
+        "distance": 1.2,
+        "aim": 0.2,
+        "clearance": 0.05,
+        "height": 0.22,
+        "fov": 30
+      }
+    },
+    {
+      "id": "e21",
+      "t": 14,
+      "target": "robot",
+      "action": "turn",
+      "args": {
+        "heading": 270,
+        "rate": 140
+      }
+    }
+  ],
+  "assets": []
+}

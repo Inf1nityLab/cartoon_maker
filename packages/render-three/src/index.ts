@@ -9,6 +9,7 @@ import { createFramePipeline, type DebugView } from './frame/pipeline.ts';
 import { sunVector } from './light/math.ts';
 import type { DofSettings, LookSettings, PostFrame } from './frame/post.ts';
 import { MultipedView } from './views/multiped.ts';
+import { RobotView } from './views/robot.ts';
 import { SkyView, TerrainView, WaterView } from './views/world.ts';
 import { createSunShadow, type CascadeInfo } from './light/sunShadow.ts';
 import { createProbe, type ProbeOptions } from './light/probe.ts';
@@ -40,7 +41,7 @@ export interface RenderAdapter {
   dispose(): void;
 }
 
-export const defaultViews: ViewRegistry = Object.fromEntries([TerrainView, WaterView, SkyView, MultipedView]) as ViewRegistry;
+export const defaultViews: ViewRegistry = Object.fromEntries([TerrainView, WaterView, SkyView, MultipedView, RobotView]) as ViewRegistry;
 
 /**
  * backend: 'auto' — WebGPU, при его отсутствии WebGL2 (откат делает сам three).

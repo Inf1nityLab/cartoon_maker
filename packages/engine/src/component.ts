@@ -58,6 +58,8 @@ export type ComponentDef<P = any, S extends object = any> = {
   state?(self: S): Record<string, unknown>;
   /** { 1: p => p2 }: переход параметров на следующую версию. */
   migrate?: Record<number, (params: any) => any>;
+  /** Готовые наборы параметров (облики): имя → params. Каждый обязан проходить схему params. */
+  presets?: Record<string, P>;
   examples: string[];
 };
 
