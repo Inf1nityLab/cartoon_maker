@@ -38,7 +38,10 @@ const film = params.get('film') === '1';
 const filmSize = { w: Number(params.get('w') ?? 1280), h: Number(params.get('h') ?? 720) };
 const FPS = Number(params.get('fps') ?? 30);
 const trackGpu = params.get('gpu') === '1';
-const adapter = createThreeAdapter(film ? { backend, mode: 'film', filmSize, pixelRatio: 1, trackGpu } : { backend, trackGpu });
+// ?taa=0 — без временного сглаживания; ?accum=N — режим накопления (кадр = среднее N сэмплов в один t, без истории;
+// будущий режим экспорта видео, обычно вместе с ?film=1); ?warmup=K — кадров прогрева после перемотки (по умолчанию 3)
+const taa = { enabled: params.get('taa') !== '0', accumulate: Number(params.get('accum') ?? 0), warmup: Number(params.get('warmup') ?? 3) };
+const adapter = createThreeAdapter(film ? { backend, taa, mode: 'film', filmSize, pixelRatio: 1, trackGpu } : { backend, taa, trackGpu });
 // ?debug=motion — векторы движения цветом вместо кадра
 const debug = params.get('debug');
 adapter.setDebugView(debug === 'motion' ? 'motion' : null);
@@ -60,7 +63,7 @@ const list = $<HTMLOListElement>('script');
 const items = doc.timeline.map((e) => {
   const li = document.createElement('li');
   li.innerHTML = `<b>${e.t.toFixed(0)}с</b><span>${e.target}.${e.action}${Object.keys(e.args).length ? ' ' + JSON.stringify(e.args) : ''}</span>`;
-  li.onclick = () => { t = e.t; draw(); };
+  li.onclick = () => { t = e.t; draw(true); };
   list.append(li);
   return li;
 });
@@ -68,8 +71,8 @@ const items = doc.timeline.map((e) => {
 const slider = $<HTMLInputElement>('t');
 slider.max = String(doc.settings.duration);
 $<HTMLButtonElement>('play').onclick = () => { playing = !playing; $('play').textContent = playing ? '⏸' : '▶'; };
-$<HTMLButtonElement>('restart').onclick = () => { t = 0; draw(); };
-slider.oninput = () => { t = Number(slider.value); draw(); };
+$<HTMLButtonElement>('restart').onclick = () => { t = 0; draw(true); };
+slider.oninput = () => { t = Number(slider.value); draw(true); };
 $<HTMLInputElement>('free').onchange = (e) => adapter.setFreeCamera((e.target as HTMLInputElement).checked);
 canvas.addEventListener('pointermove', () => { if (!playing) draw(); });
 canvas.addEventListener('wheel', () => { if (!playing) draw(); });
@@ -82,8 +85,10 @@ function frameSize() {
   return { w: Math.max(2, Math.floor(w)), h: Math.max(2, Math.floor(w / a)) };
 }
 
-function draw() {
+/** jump — момент не следует за прошлым показанным (перемотка, склейка): история TAA сбрасывается и прогревается. */
+function draw(jump = false) {
   const w = engine.seek(t);
+  if (jump) adapter.discontinuity();
   adapter.sync(w, engine.sim());
   const { w: cw, h: ch } = frameSize();
   adapter.render({ w: cw, h: ch });
@@ -101,8 +106,9 @@ function frame() {
   const n = performance.now();
   if (playing) {
     t += film ? 1 / FPS : (n - last) / 1000;
-    if (t > doc.settings.duration) t = 0;
-    draw();
+    const wrapped = t > doc.settings.duration;
+    if (wrapped) t = 0;
+    draw(wrapped);
   }
   last = n;
   requestAnimationFrame(frame);
@@ -113,13 +119,26 @@ function frame() {
   // prev — секунда, которую рисуем перед sec: от неё считаются векторы движения (кадр до sec)
   show(sec: number, prev?: number) {
     playing = false;
-    if (prev !== undefined) { t = prev; draw(); }
+    // показ секунды — перемотка (история сбрасывается и прогревается); prev, если задан, — один шаг «играть» до sec
+    if (prev !== undefined) { t = prev; draw(true); t = sec; draw(); } else { t = sec; draw(true); }
+    return hashWorldState(engine.state());
+  },
+  // один кадр на секунде sec, следующий за прошлым показанным (без перемотки): векторы движения от прошлого кадра
+  step(sec: number) {
+    playing = false;
     t = sec; draw();
     return hashWorldState(engine.state());
   },
   // ?gpu=1: GPU-время последнего кадра, мс (замеры; в обычной работе не нужен)
   gpuMs: () => adapter.gpuMs(),
   shadowInfo: () => adapter.shadowInfo(),
+  // играет кадры from, from+1/fps, … до to по одному (первый — перемотка, остальные следуют друг за другом)
+  play(from: number, to: number) {
+    playing = false;
+    const n = Math.round((to - from) * FPS);
+    for (let i = 0; i <= n; i++) { t = from + i / FPS; draw(i === 0); }
+    return hashWorldState(engine.state());
+  },
 };
-if (film) draw(); // пауза: первый кадр рисуем сразу
+if (film) draw(true); // пауза: первый кадр рисуем сразу
 frame();

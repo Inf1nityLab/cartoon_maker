@@ -12,7 +12,7 @@ import { createSunShadow, type CascadeInfo } from './light/sunShadow.ts';
 import { createProbe, type ProbeOptions } from './light/probe.ts';
 
 export * from './view.ts';
-export type { FrameMode, FrameOptions } from './film.ts';
+export type { FrameMode, FrameOptions, TaaOptions } from './film.ts';
 export type { DebugView } from './frame/pipeline.ts';
 export type { CascadeInfo } from './light/sunShadow.ts';
 export type { ProbeOptions } from './light/probe.ts';
@@ -33,6 +33,8 @@ export interface RenderAdapter {
   setProbe(p: ProbeOptions | null): void;
   /** Каскады теней солнца: до какого расстояния, размер карты и тексела (м), смещения. */
   shadowInfo(): CascadeInfo[];
+  /** Следующий render() показывает момент, не следующий за прошлым (склейка, перемотка): история TAA сбрасывается и прогревается. */
+  discontinuity(): void;
   dispose(): void;
 }
 
@@ -64,7 +66,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       const renderer = new WebGPURenderer({ canvas: c as HTMLCanvasElement, antialias: false, forceWebGL: opts.backend === 'webgl2', trackTimestamp: opts.trackGpu === true });
       await renderer.init();
       renderer.setPixelRatio(frame.pixelRatio);
-      pipeline = createFramePipeline(renderer, { samples: frame.samples });
+      pipeline = createFramePipeline(renderer, { samples: frame.samples, aa: frame.aa });
       pipeline.setDebug(debugView);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.shadowMap.enabled = true;
@@ -111,6 +113,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
     setProbe(p) { probeOpts = p; probe?.set(p); },
     shadowInfo: () => sunShadow.info().map((c) => ({ ...c })),
     setDebugView(v) { debugView = v; pipeline?.setDebug(v); },
+    discontinuity() { pipeline?.discontinuity(); },
     capture: () => createImageBitmap(canvas as HTMLCanvasElement),
     setFreeCamera(on) {
       free = on;
