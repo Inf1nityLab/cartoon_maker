@@ -1,0 +1,29 @@
+{
+  "name": "cartoon-engine",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.21.0",
+  "scripts": {
+    "dev": "pnpm --filter @cartoon/player dev",
+    "build": "pnpm --filter @cartoon/player build",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "scenes": "pnpm --filter @cartoon/scenes build",
+    "e2e": "playwright test",
+    "licenses:check": "node scripts/check-licenses.mjs"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vite": "^8.3.6",
+    "vitest": "^3.2.4",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
+    "@playwright/test": "^1.50.0",
+    "@cartoon/schema": "workspace:*",
+    "@cartoon/engine": "workspace:*",
+    "@cartoon/components": "workspace:*",
+    "@cartoon/director": "workspace:*"
+  }
+}

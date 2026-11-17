@@ -1,0 +1,238 @@
+{
+  "schema": "scene@1",
+  "id": "scene-01",
+  "title": "Сцена 01: паук на закате",
+  "settings": {
+    "fps": 60,
+    "duration": 60,
+    "seed": 7,
+    "aspect": "16:9"
+  },
+  "world": [
+    {
+      "id": "terrain",
+      "type": "Terrain",
+      "version": 1,
+      "params": {
+        "style": "hills",
+        "seed": 7
+      }
+    },
+    {
+      "id": "water",
+      "type": "Water",
+      "version": 1,
+      "params": {}
+    },
+    {
+      "id": "sky",
+      "type": "Sky",
+      "version": 1,
+      "params": {
+        "elevation": 9,
+        "azimuth": 205
+      }
+    }
+  ],
+  "entities": {
+    "spider": {
+      "id": "spider",
+      "type": "Multiped",
+      "version": 1,
+      "params": {
+        "color": "#ff5a1f"
+      },
+      "spawn": {
+        "at": "meadow",
+        "heading": 0
+      }
+    }
+  },
+  "places": {
+    "meadow": [
+      -38,
+      0,
+      -8
+    ],
+    "lakeShore": [
+      34,
+      0,
+      2
+    ]
+  },
+  "paths": {
+    "valleyLoop": {
+      "points": [
+        [
+          31,
+          0,
+          0
+        ],
+        [
+          20,
+          0,
+          25
+        ],
+        [
+          -5,
+          0,
+          38
+        ],
+        [
+          -30,
+          0,
+          22
+        ],
+        [
+          -38,
+          0,
+          -8
+        ],
+        [
+          -20,
+          0,
+          -30
+        ],
+        [
+          8,
+          0,
+          -34
+        ],
+        [
+          30,
+          0,
+          -22
+        ]
+      ],
+      "closed": true
+    }
+  },
+  "camera": {
+    "shots": {}
+  },
+  "timeline": [
+    {
+      "id": "e1",
+      "t": 0,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "establishing",
+        "target": "spider"
+      }
+    },
+    {
+      "id": "e2",
+      "t": 0,
+      "target": "spider",
+      "action": "followPath",
+      "args": {
+        "path": "valleyLoop",
+        "speed": 2
+      }
+    },
+    {
+      "id": "e3",
+      "t": 7,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "follow",
+        "target": "spider",
+        "side": "left"
+      }
+    },
+    {
+      "id": "e4",
+      "t": 16,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "lowAngle",
+        "target": "spider"
+      }
+    },
+    {
+      "id": "e5",
+      "t": 21,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "orbit",
+        "target": "spider",
+        "speed": 18
+      }
+    },
+    {
+      "id": "e6",
+      "t": 27,
+      "target": "spider",
+      "action": "stop",
+      "args": {}
+    },
+    {
+      "id": "e7",
+      "t": 27,
+      "target": "spider",
+      "action": "lookAt",
+      "args": {
+        "target": "camera"
+      }
+    },
+    {
+      "id": "e8",
+      "t": 29,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "closeup",
+        "target": "spider",
+        "on": "eyes"
+      }
+    },
+    {
+      "id": "e9",
+      "t": 36,
+      "target": "spider",
+      "action": "followPath",
+      "args": {
+        "path": "valleyLoop",
+        "speed": 2.4
+      }
+    },
+    {
+      "id": "e10",
+      "t": 36,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "follow",
+        "target": "spider",
+        "side": "right"
+      }
+    },
+    {
+      "id": "e11",
+      "t": 45,
+      "target": "world",
+      "action": "sun",
+      "args": {
+        "elevation": 0.6,
+        "duration": 14
+      }
+    },
+    {
+      "id": "e12",
+      "t": 50,
+      "target": "camera",
+      "action": "shot",
+      "args": {
+        "name": "crane",
+        "target": "spider",
+        "to": 30,
+        "duration": 8
+      }
+    }
+  ],
+  "assets": []
+}

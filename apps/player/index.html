@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cartoon Engine — плеер</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage"><canvas id="view"></canvas></div>
+      <aside>
+        <section><h3>Сценарий</h3><ol id="script"></ol></section>
+        <section><h3>WorldState</h3><pre id="state"></pre></section>
+      </aside>
+      <footer>
+        <button id="play" title="Пауза / играть">⏸</button>
+        <button id="restart" title="Сначала">⏮</button>
+        <input id="t" type="range" min="0" max="60" step="0.01" value="0" />
+        <span id="time"></span>
+        <label><input type="checkbox" id="free" /> свободная камера</label>
+        <label><input type="checkbox" id="vertical" /> 9:16</label>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

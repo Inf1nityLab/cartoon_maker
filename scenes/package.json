@@ -1,0 +1,1 @@
+{ "name": "@cartoon/scenes", "private": true, "version": "0.0.0", "type": "module", "scripts": { "build": "node --experimental-strip-types src/build.ts" }, "dependencies": { "@cartoon/director": "workspace:*" } }

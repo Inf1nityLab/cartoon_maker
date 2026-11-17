@@ -1,0 +1,11 @@
+{
+  "name": "@cartoon/export",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@cartoon/engine": "workspace:*",
+    "@cartoon/render-three": "workspace:*"
+  }
+}

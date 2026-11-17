@@ -1,0 +1,18 @@
+{
+  // Чужой код (nanite-lib): типы проверяем так же строго, как свои, но без noUnusedLocals/noUnusedParameters (чужой стиль не правим).
+  // Проект-ссылка: корневой проект видит vendor через его .d.ts, поэтому неиспользуемые импорты чужого кода не попадают в наши ошибки.
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "outDir": "../../../node_modules/.cache/tsc-vendor",
+    "tsBuildInfoFile": "../../../node_modules/.cache/tsc-vendor/vendor.tsbuildinfo",
+    "rootDir": ".",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["threejs-nanites/**/*.ts"],
+  "exclude": ["**/node_modules"]
+}
