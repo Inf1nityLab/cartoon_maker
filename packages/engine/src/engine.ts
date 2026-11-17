@@ -1,6 +1,7 @@
 import { hashWorldState, type SceneDoc, type Vec3, type WorldState, type EntityState } from '@cartoon/schema';
 import type { CameraState, ComponentDef, Ctx, EntityHandle, PathSampler, Registry, Services } from './component.ts';
 import { createPath } from './paths.ts';
+import { CameraFocusArgs } from './focus.ts';
 import { rngNext, rngSeed } from './rng.ts';
 
 export type CameraSim = CameraState & { args: Record<string, unknown>; start: number };
@@ -161,7 +162,13 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
 
   function apply(e: SceneDoc['timeline'][number]): void {
     if (e.target === 'camera') {
-      if (e.action !== 'shot') throw new Error(`Событие ${e.id}: у камеры есть только действие shot, получено «${e.action}»`);
+      if (e.action === 'focus') {
+        const r = CameraFocusArgs.safeParse(e.args);
+        if (!r.success) throw new Error(`Событие ${e.id}: camera.focus: ${r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+        camera.dof = r.data.strength > 0 ? { focus: r.data.focus, range: r.data.range, strength: r.data.strength } : undefined;
+        return;
+      }
+      if (e.action !== 'shot') throw new Error(`Событие ${e.id}: у камеры есть действия shot и focus, получено «${e.action}»`);
       const { name, ...rest } = e.args as { name?: string };
       if (typeof name !== 'string') throw new Error(`Событие ${e.id}: camera.shot требует name`);
       camera.shot = name;
@@ -216,7 +223,11 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
     return {
       t: time(),
       sun: { ...sun },
-      camera: { shot: camera.shot, pos: [...camera.pos], target: [...camera.target], fov: camera.fov },
+      camera: {
+        shot: camera.shot, pos: [...camera.pos], target: [...camera.target], fov: camera.fov,
+        // ключ dof есть только пока глубина резкости включена: у сцен без неё хэш WorldState прежний
+        ...(camera.dof ? { dof: { focus: camera.dof.focus === 'target' ? dist(camera.pos, camera.target) : camera.dof.focus, range: camera.dof.range, strength: camera.dof.strength } } : {}),
+      },
       inFrame: inFrame(entities),
       entities,
     };
@@ -262,6 +273,7 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
 }
 
 export { hashWorldState };
+const dist = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const norm = (a: Vec3): Vec3 => {
   const l = Math.hypot(a[0], a[1], a[2]) || 1;

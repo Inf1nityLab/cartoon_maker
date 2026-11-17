@@ -1,5 +1,6 @@
 import { validateSceneDoc, zodErrors, type SceneDoc } from '@cartoon/schema';
 import type { Registry } from './component.ts';
+import { CameraFocusArgs } from './focus.ts';
 
 /**
  * Полная проверка для ИИ: структура + параметры компонентов + аргументы событий.
@@ -28,8 +29,13 @@ export function validateAgainstRegistry(raw: unknown, reg: Registry): { ok: true
   doc.timeline.forEach((ev, i) => {
     const at = `timeline[${i}]`;
     if (ev.target === 'camera') {
+      if (ev.action === 'focus') {
+        const r = CameraFocusArgs.safeParse(ev.args);
+        if (!r.success) errors.push(...zodErrors(r.error, ev.args, `${at}.args.`));
+        return;
+      }
       const name = ev.args.name;
-      if (ev.action !== 'shot') return void errors.push(`${at}.action: у камеры есть только shot, получено «${ev.action}»`);
+      if (ev.action !== 'shot') return void errors.push(`${at}.action: у камеры есть shot и focus, получено «${ev.action}»`);
       if (typeof name !== 'string') return void errors.push(`${at}.args.name: имя кадра обязательно`);
       const inst = doc.camera.shots[name];
       const def = reg.shots[inst?.type ?? name];

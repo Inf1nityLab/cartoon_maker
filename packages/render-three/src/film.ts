@@ -12,6 +12,8 @@ export type FrameOptions = {
   samples?: 1 | 4;
   /** Временное сглаживание. По умолчанию включено. */
   taa?: TaaOptions;
+  /** false — все пост-эффекты кино (вид плёнки, глубина резкости, лучи) выключены, как будто их нет в сцене. По умолчанию true. */
+  fx?: boolean;
 };
 
 export type TaaOptions = {
@@ -35,6 +37,8 @@ export type ResolvedFrame = {
   /** MSAA цели сцены с учётом TAA: при aa.mode === 'taa' всегда 1. */
   samples: 1 | 4;
   aa: { mode: AaMode; accumulate: number; warmup: number };
+  /** Пост-эффекты кино разрешены (false — ?fx=0). */
+  fx: boolean;
   /** Размер кадра для запрошенного размера окна: в film всегда filmSize, в preview — как просили. */
   size(requested: { w: number; h: number }): { w: number; h: number };
   /** Размер цели рендера в пикселях для кадра размера `s`. */
@@ -60,6 +64,7 @@ export function resolveFrame(opts: FrameOptions = {}): ResolvedFrame {
     pixelRatio,
     samples: aaMode === 'taa' ? 1 : (opts.samples ?? 4),
     aa: { mode: aaMode, accumulate, warmup },
+    fx: opts.fx ?? true,
     size: (r) => fixed ?? r,
     pixels: (s) => ({ w: Math.max(1, Math.round(s.w * pixelRatio)), h: Math.max(1, Math.round(s.h * pixelRatio)) }),
   };

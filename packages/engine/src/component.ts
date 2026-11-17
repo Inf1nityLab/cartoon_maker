@@ -8,7 +8,9 @@ export type PathSampler = {
 };
 
 export type EntityHandle = { id: string; pos: Vec3; heading: number; state: Record<string, unknown> };
-export type CameraState = { shot: string; pos: Vec3; target: Vec3; fov: number };
+/** Глубина резкости в состоянии камеры: focus — метры или 'target' (расстояние до точки, на которую смотрит камера). */
+export type CameraDofState = { focus: number | 'target'; range: number; strength: number };
+export type CameraState = { shot: string; pos: Vec3; target: Vec3; fov: number; dof?: CameraDofState };
 
 /** Сервисы, которые мир предоставляет компонентам (Terrain даёт heightAt, Water — waterLevel). */
 export type Services = {

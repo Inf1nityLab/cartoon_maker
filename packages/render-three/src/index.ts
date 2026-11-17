@@ -6,6 +6,8 @@ import type { SceneDoc, WorldState } from '@cartoon/schema';
 import type { ThreeCtx, ViewDef, ViewRegistry } from './view.ts';
 import { resolveFrame, type FrameOptions } from './film.ts';
 import { createFramePipeline, type DebugView } from './frame/pipeline.ts';
+import { sunVector } from './light/math.ts';
+import type { DofSettings, LookSettings, PostFrame } from './frame/post.ts';
 import { MultipedView } from './views/multiped.ts';
 import { SkyView, TerrainView, WaterView } from './views/world.ts';
 import { createSunShadow, type CascadeInfo } from './light/sunShadow.ts';
@@ -58,6 +60,8 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
   let sunShadow!: ReturnType<typeof createSunShadow>;
   let probe!: ReturnType<typeof createProbe>;
   let lastTarget: [number, number, number] = [0, 0, 0];
+  let lookId: string | null = null; // компонент FilmLook сцены (вид плёнки)
+  let post: PostFrame | null = null;
   const mounted: { handle: unknown; view: ViewDef; id: string }[] = [];
 
   return {
@@ -66,7 +70,8 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       const renderer = new WebGPURenderer({ canvas: c as HTMLCanvasElement, antialias: false, forceWebGL: opts.backend === 'webgl2', trackTimestamp: opts.trackGpu === true });
       await renderer.init();
       renderer.setPixelRatio(frame.pixelRatio);
-      pipeline = createFramePipeline(renderer, { samples: frame.samples, aa: frame.aa });
+      lookId = [...doc.world, ...Object.values(doc.entities)].find((c) => c.type === 'FilmLook')?.id ?? null;
+      pipeline = createFramePipeline(renderer, { samples: frame.samples, aa: frame.aa, post: frame.fx, rays: frame.fx && lookId !== null });
       pipeline.setDebug(debugView);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.shadowMap.enabled = true;
@@ -88,6 +93,11 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
     sync(state, snap) {
       for (const m of mounted) m.view.sync(m.handle, snap.components[m.id]!.self, three, state);
       lastTarget = state.camera.target;
+      if (frame.fx) {
+        const look = lookId ? (snap.components[lookId]?.self as LookSettings | undefined) ?? null : null;
+        const dof: DofSettings | null = state.camera.dof ? { ...state.camera.dof } : null;
+        post = look || dof ? { look, dof, sunDir: sunVector(state.sun.elevation, state.sun.azimuth) } : null;
+      }
       if (!free) {
         camera.position.set(...state.camera.pos);
         camera.lookAt(...state.camera.target);
@@ -103,7 +113,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       controls?.update();
       sunShadow.update(); // каскады и смещения под текущие fov/aspect: до рендера, чтобы кадр не зависел от прошлого
       const px = frame.pixels({ w, h });
-      pipeline.render(three.scene, camera, px);
+      pipeline.render(three.scene, camera, px, post);
     },
     async gpuMs() {
       await three.renderer.resolveTimestampsAsync('render');

@@ -1,6 +1,6 @@
 import './style.css';
 import { createEngine, validateAgainstRegistry } from '@cartoon/engine';
-import { registry } from '@cartoon/components';
+import { registry, FILM_LOOK_PRESETS, type FilmLookPreset } from '@cartoon/components';
 import { createThreeAdapter } from '@cartoon/render-three';
 import { hashWorldState, migrate, type SceneDoc } from '@cartoon/schema';
 import sceneJson from '../../../scenes/scene-01.json';
@@ -27,6 +27,25 @@ if (q.get('flat') === '1') {
   if (ter) ter.params = { ...ter.params, style: 'flat' };
 }
 
+// ?look=<пресет FilmLook> (neutral | cinema | warm-evening | vertical) — добавляет вид плёнки в копию документа;
+// ?lookset=ключ:значение,… — поверх пресета (warmth, contrast, saturation, vignette, crop, rays).
+// ?dof=фокус,диапазон,сила — глубина резкости с 0-й секунды (событие camera.focus; фокус число в метрах или target).
+// ?fx=0 — все пост-эффекты кино выключены (в адаптере). Файл сцены не меняется, хэш WorldState честный.
+const lookQ = q.get('look');
+if (lookQ !== null && lookQ in FILM_LOOK_PRESETS) {
+  const over = Object.fromEntries((q.get('lookset') ?? '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split(':'); return [k!, Number.isFinite(Number(v)) ? Number(v) : v]; }));
+  doc.world.push({ id: 'filmlook', type: 'FilmLook', version: 1, params: { ...FILM_LOOK_PRESETS[lookQ as FilmLookPreset], ...over } });
+}
+const dofQ = q.get('dof');
+if (dofQ !== null) {
+  const [f, r, st] = dofQ.split(',');
+  doc.timeline.unshift({ id: 'dof0', t: 0, target: 'camera', action: 'focus', args: { focus: f === 'target' ? 'target' : Number(f), range: Number(r), strength: Number(st) } });
+}
+const revalidated = validateAgainstRegistry(doc, registry);
+if (!revalidated.ok) {
+  document.body.innerHTML = `<div class="err">Параметры URL не прошли проверку:\n${revalidated.errors.join('\n')}</div>`;
+  throw new Error(revalidated.errors.join('\n'));
+}
 const engine = createEngine({ registry });
 engine.load(doc);
 // ?backend=webgl2 — принудительно WebGL2 (скриншот-тесты); иначе WebGPU с откатом
@@ -41,7 +60,8 @@ const trackGpu = params.get('gpu') === '1';
 // ?taa=0 — без временного сглаживания; ?accum=N — режим накопления (кадр = среднее N сэмплов в один t, без истории;
 // будущий режим экспорта видео, обычно вместе с ?film=1); ?warmup=K — кадров прогрева после перемотки (по умолчанию 3)
 const taa = { enabled: params.get('taa') !== '0', accumulate: Number(params.get('accum') ?? 0), warmup: Number(params.get('warmup') ?? 3) };
-const adapter = createThreeAdapter(film ? { backend, taa, mode: 'film', filmSize, pixelRatio: 1, trackGpu } : { backend, taa, trackGpu });
+const fx = params.get('fx') !== '0';
+const adapter = createThreeAdapter(film ? { backend, taa, fx, mode: 'film', filmSize, pixelRatio: 1, trackGpu } : { backend, taa, fx, trackGpu });
 // ?debug=motion — векторы движения цветом вместо кадра
 const debug = params.get('debug');
 adapter.setDebugView(debug === 'motion' ? 'motion' : null);

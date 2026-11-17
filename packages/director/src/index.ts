@@ -20,18 +20,19 @@ function plain(args: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(args).map(([k, v]) => [k, v && (v as any)[HANDLE] ? (v as EntityHandle).id : v]));
 }
 
+type Focus = { focus?: number | 'target'; range?: number; strength?: number };
 type Sun = { elevation?: number; azimuth?: number; duration?: number };
 type ShotName = 'establishing' | 'follow' | 'lowAngle' | 'orbit' | 'closeup' | 'crane';
 
 export type Director = {
   places(p: Record<string, Vec3>): void;
   path(id: string, p: { points: Vec3[]; closed?: boolean }): void;
-  world: { use(type: string, params?: Record<string, unknown>): void; sun(a: Sun): void };
+  world: { use(type: string, params?: Record<string, unknown>): void; sun(a: Sun): void; look(a: Record<string, unknown>): void; lookPreset(name: string): void };
   add(type: string, params?: Record<string, unknown>, spawn?: { at: Target; heading?: number; id?: string }): EntityHandle;
   at(t: number): {
     do(...cmds: Command[]): void;
-    camera: { shot(name: ShotName, args?: Record<string, unknown>): void };
-    world: { sun(a: Sun): void };
+    camera: { shot(name: ShotName, args?: Record<string, unknown>): void; focus(a?: Focus): void };
+    world: { sun(a: Sun): void; look(a: Record<string, unknown>): void; lookPreset(name: string): void };
   };
 };
 
@@ -48,7 +49,11 @@ export function buildScene(fn: (s: Director) => void, meta: SceneMeta): SceneDoc
   const events: TimelineEvent[] = [];
   let n = 0;
   const push = (t: number, c: Command) => events.push({ id: `e${++n}`, t, ...c });
-  const worldApi = (t: number) => ({ sun: (a: Sun) => push(t, { target: 'world', action: 'sun', args: { ...a } }) });
+  const worldApi = (t: number) => ({
+    sun: (a: Sun) => push(t, { target: 'world', action: 'sun', args: { ...a } }),
+    look: (a: Record<string, unknown>) => push(t, { target: 'world', action: 'look', args: { ...a } }),
+    lookPreset: (name: string) => push(t, { target: 'world', action: 'lookPreset', args: { name } }),
+  });
 
   const s: Director = {
     places: (p) => void Object.assign(doc.places, p),
@@ -56,6 +61,8 @@ export function buildScene(fn: (s: Director) => void, meta: SceneMeta): SceneDoc
     world: {
       use(type, params = {}) { doc.world.push({ id: type.toLowerCase(), type, version: 1, params }); },
       sun: worldApi(0).sun,
+      look: worldApi(0).look,
+      lookPreset: worldApi(0).lookPreset,
     },
     add(type, params = {}, spawn = { at: [0, 0, 0] }) {
       const id = spawn.id ?? `${type.toLowerCase()}${(counts[type] = (counts[type] ?? 0) + 1)}`;
@@ -64,7 +71,10 @@ export function buildScene(fn: (s: Director) => void, meta: SceneMeta): SceneDoc
     },
     at: (t) => ({
       do: (...cmds) => cmds.forEach((c) => push(t, c)),
-      camera: { shot: (name, args = {}) => push(t, { target: 'camera', action: 'shot', args: plain({ name, ...args }) }) },
+      camera: {
+        shot: (name, args = {}) => push(t, { target: 'camera', action: 'shot', args: plain({ name, ...args }) }),
+        focus: (a = {}) => push(t, { target: 'camera', action: 'focus', args: { ...a } }),
+      },
       world: worldApi(t),
     }),
   };

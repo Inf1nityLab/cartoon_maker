@@ -1,7 +1,8 @@
 import * as THREE from 'three/webgpu';
-import { Fn, mrt, output, velocity, vec2, vec3, vec4, float, texture, uniform, uv, max, min, select, clamp, dot, sqrt, exp, abs, length } from 'three/tsl';
+import { Fn, Loop, mrt, output, velocity, vec2, vec3, vec4, float, texture, uniform, uv, max, min, select, clamp, dot, sqrt, exp, abs, length, cos, sin, fract, smoothstep, mix, log2, exp2 } from 'three/tsl';
 import type { AaMode } from '../film.ts';
 import { accumulationOffsets, taaJitter } from './jitter.ts';
+import { DOF_REF_HEIGHT, DOF_TAPS, cropRect, raysFade, sunScreen, type PostFrame, type Vec3 } from './post.ts';
 
 /**
  * Счётчик «кадра» узлов three (frameId) растёт сам по requestAnimationFrame, а не от наших render(). От него зависят
@@ -20,6 +21,10 @@ export type PipelineOptions = {
   /** MSAA цели сцены. В режиме 'taa' вызывающий передаёт 1 (см. resolveFrame). */
   samples: 1 | 4;
   aa: { mode: AaMode; accumulate: number; warmup: number };
+  /** Пост-проходы кино (лучи, глубина резкости, цвет) собираются в графе. false — графа нет вовсе, кадр как до задачи 1.7. */
+  post: boolean;
+  /** Лучи солнца встроены в граф (нужен компонент FilmLook в сцене). Без них в графе нет ни одной выборки лучей. */
+  rays: boolean;
 };
 
 // --- настройки TAA (разбор каждой части — в комментариях ниже) ---
@@ -74,6 +79,49 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
   const motionTex = texture(rt.textures[1]!);
   const depthTex = texture(rt.depthTexture);
 
+  // ---------------------------------------------------------------- солнечные лучи (god rays), полразрешения
+  // Проход идёт после КАЖДОГО рендера сцены (в том числе джиттер-сэмпла) по глубине этого же рендера, а результат
+  // прибавляется к цвету сцены на входе TAA/накопления (scn): ступеньки вдоль лучей, которые оставляют фиксированные
+  // выборки и половинное разрешение, усредняются вместе с краями. Радиальный марш — по образцу godrays.ts демо (MIT),
+  // но со своим шумом начала марша (interleaved gradient noise от пикселя и номера кадра, не от случайных чисел).
+  const RAY_SAMPLES = 40;
+  const raysRT = opts.post && opts.rays ? new THREE.RenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false }) : null;
+  const ru = {
+    sunUv: uniform(new THREE.Vector2(0.5, 0.5)),
+    aspect: uniform(1),
+    strength: uniform(0),
+    phase: uniform(0),
+  };
+  const raysMat = new THREE.NodeMaterial();
+  raysMat.toneMapped = false;
+  raysMat.blending = THREE.NoBlending;
+  if (raysRT) {
+    raysMat.fragmentNode = Fn(() => {
+      const here = uv();
+      const toSun = ru.sunUv.sub(here);
+      const span = length(toSun.mul(vec2(ru.aspect, 1)));
+      // марш не длиннее половины экрана: дальше лучи слабы, а выборки редки
+      const step = toSun.mul(float(0.5).div(max(span, 0.5))).div(RAY_SAMPLES);
+      const pix = here.mul(size);
+      const noise = fract(fract(dot(pix, vec2(0.06711056, 0.00583715))).mul(52.9829189).add(ru.phase.mul(0.381966)));
+      const sum = float(0).toVar(), w = float(1).toVar(), p = here.add(step.mul(noise)).toVar();
+      Loop(RAY_SAMPLES, () => {
+        p.addAssign(step);
+        const d = depthTex.sample(clamp(p, vec2(0), vec2(0.9999))).x;
+        // чистое небо около диска солнца светится (ореол, который несут лучи), вдали — нет
+        const off = length(p.sub(ru.sunUv).mul(vec2(ru.aspect, 1)));
+        sum.addAssign(select(d.greaterThanEqual(SKY_DEPTH), exp(off.mul(-6)), float(0)).mul(w));
+        w.mulAssign(0.97);
+      });
+      // слабее с расстоянием пикселя от солнца: иначе весь экран под солнцем у края кадра выцветает
+      return vec4(vec3(1, 0.86, 0.66).mul(sum.mul(ru.strength).mul(exp(span.mul(-2.5))).div(RAY_SAMPLES * 0.4)), 1);
+    })();
+  }
+  const raysQuad = new THREE.QuadMesh(raysMat);
+  const raysTex = raysRT ? texture(raysRT.texture) : null;
+  /** Цвет сцены в точке q: то, что нарисовала сцена, плюс лучи (если они вообще собраны в граф). */
+  const scn = (q: any) => (raysTex ? sceneTex.sample(q).rgb.add(raysTex.sample(q).rgb) : sceneTex.sample(q).rgb);
+
   // ---------------------------------------------------------------- TAA: слияние с историей
   const makeRT = () => new THREE.RenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
   const history = taa ? [makeRT(), makeRT()] : [];
@@ -122,7 +170,7 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
         for (let dx = -1; dx <= 1; dx++) {
           const q = clamp(p.add(vec2(dx, dy)), vec2(0), R.sub(1));
           const quv = q.add(0.5).div(R);
-          const e = enc(sceneTex.sample(quv).rgb);
+          const e = enc(scn(quv));
           // вес сэмпла: чем ближе он лёг к центру пикселя, тем больше
           const dq = q.add(0.5).sub(at);
           const wq = exp(dot(dq, dq).mul(-KERNEL));
@@ -170,7 +218,7 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
   // ---------------------------------------------------------------- накопление N сэмплов
   const accumRT = accum ? makeRT() : null;
   const accumNode = Fn(() => {
-    const c = sceneTex.sample(uv()).rgb;
+    const c = scn(uv());
     const k = float(1).div(luma(c).add(1)); // вес Карис: яркое солнце не даёт «светлячков» на краях
     return vec4(c.mul(k), k);
   })();
@@ -192,7 +240,7 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
   const shownTex = texture(taa ? history[0]!.texture : accumRT ? accumRT.texture : rt.textures[0]!);
   const shown = (() => {
     if (accum) { const a = shownTex.sample(uv()); return a.rgb.div(max(a.a, 1e-5)); }
-    if (!taa) return shownTex.rgb;
+    if (!taa) return raysTex ? shownTex.rgb.add(raysTex.rgb) : shownTex.rgb;
     // лёгкий unsharp по 4 соседям; в сжатом пространстве x/(1+x): иначе диск солнца (≫1) обводится чёрным кольцом
     const px = vec2(1).div(size);
     const squash = (v: any) => v.div(v.add(1));
@@ -204,6 +252,74 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
   })();
   // тонмаппинг и sRGB добавляет сам RenderPipeline (renderer.toneMapping, toneMappingExposure)
   const main = new THREE.RenderPipeline(renderer, vec4(shown as any, 1));
+
+  // ---------------------------------------------------------------- пост кино: глубина резкости, цвет, виньетка, рамка
+  // Идёт ПОСЛЕ сглаживания, в линейном HDR до тонмаппинга. Узлы собираются лениво и по вариантам: без глубины резкости
+  // в графе нет ни одной её выборки, без FilmLook и камеры с фокусом работает прежний `main`.
+  const pu = {
+    // глубина резкости
+    focus: uniform(1), range: uniform(1), strength: uniform(0), near: uniform(0.1), far: uniform(800),
+    // вид плёнки
+    warmth: uniform(0), contrast: uniform(1), saturation: uniform(1), vignette: uniform(0),
+    rect: uniform(new THREE.Vector4(0, 0, 1, 1)), // видимый кадр, пиксели: x0 y0 x1 y1
+  };
+  /** Цвет итогового (сглаженного) кадра в точке q, без unsharp: для выборок сборки размытия. */
+  const colorAt = (q: any) => {
+    if (accum) { const a = shownTex.sample(q); return a.rgb.div(max(a.a, 1e-5)); }
+    return raysTex && !taa ? shownTex.sample(q).rgb.add(raysTex.sample(q).rgb) : shownTex.sample(q).rgb;
+  };
+  /** Радиус нерезкости в пикселях по значению буфера глубины: формула cocRadius из post.ts. */
+  const cocOf = (q: any) => {
+    const d = depthTex.sample(q).x;
+    const z = select(d.greaterThanEqual(SKY_DEPTH), pu.far, pu.near.mul(pu.far).div(pu.far.sub(pu.far.sub(pu.near).mul(d))));
+    const dz = max(abs(z.sub(pu.focus)).sub(pu.range), 0);
+    return min(dz.div(z), 1).mul(pu.strength).mul(size.y.div(DOF_REF_HEIGHT));
+  };
+  /**
+   * Сборка размытия: выборки по спирали «подсолнух» радиуса R = нерезкость ЭТОГО пикселя. Выборка влияет, только если
+   * её собственный радиус нерезкости достаёт до центра (c_s ≥ ρ): резкий герой не «растекается» на размытый фон, а
+   * размытый фон не затекает под резкий силуэт. Где радиус мал — берём резкий исходный кадр (смесь по smoothstep).
+   */
+  const dofColor = (sharp: any) => Fn(() => {
+    const here = uv();
+    const c0 = cocOf(here);
+    const c00 = colorAt(here);
+    const w00 = float(1).div(luma(c00).add(1));
+    const acc = c00.mul(w00).toVar(), wsum = w00.toVar();
+    Loop(DOF_TAPS, ({ i }: any) => {
+      const f = float(i);
+      const ang = f.mul(2.399963);
+      const rho = sqrt(f.add(0.5).div(DOF_TAPS)).mul(c0);
+      const q = here.add(vec2(cos(ang), sin(ang)).mul(rho).div(size));
+      const cs = cocOf(q);
+      const col = colorAt(q);
+      const w = clamp(cs.sub(rho).add(1), 0, 1).mul(float(1).div(luma(col).add(1)));
+      acc.addAssign(col.mul(w));
+      wsum.addAssign(w);
+    });
+    const blurred = acc.div(max(wsum, 1e-5));
+    return mix(sharp, blurred, smoothstep(0.5, 1.5, c0));
+  })();
+  /** Теплота, контраст, насыщенность, виньетка и рамка. */
+  const finishLook = (rgb0: any) => {
+    const pix = uv().mul(size);
+    const warm = rgb0.mul(vec3(float(1).add(pu.warmth.mul(0.10)), float(1).add(pu.warmth.mul(0.02)), float(1).sub(pu.warmth.mul(0.12))));
+    const lg = log2(max(warm, vec3(1e-4)).div(0.18));
+    const con = exp2(lg.mul(pu.contrast)).mul(0.18);
+    const y = luma(con);
+    const sat = max(mix(vec3(y), con, pu.saturation), vec3(0));
+    const half = vec2(pu.rect.z.sub(pu.rect.x), pu.rect.w.sub(pu.rect.y)).mul(0.5);
+    const center = vec2(pu.rect.x.add(pu.rect.z), pu.rect.y.add(pu.rect.w)).mul(0.5);
+    const r = length(pix.sub(center).div(half)).div(1.41421356);
+    const vig = float(1).sub(pu.vignette.mul(smoothstep(0.4, 1.0, r)).mul(0.7));
+    const inside = pix.x.greaterThanEqual(pu.rect.x).and(pix.x.lessThan(pu.rect.z)).and(pix.y.greaterThanEqual(pu.rect.y)).and(pix.y.lessThan(pu.rect.w));
+    return select(inside, sat.mul(vig), vec3(0));
+  };
+  const variants: { look?: THREE.RenderPipeline; lookDof?: THREE.RenderPipeline } = {};
+  const lookPipeline = (withDof: boolean) => {
+    const key = withDof ? 'lookDof' : 'look';
+    return (variants[key] ??= new THREE.RenderPipeline(renderer, vec4(finishLook(withDof ? dofColor(shown as any) : (shown as any)) as any, 1)));
+  };
   // отладка: серый — нет движения; цвет — куда и насколько сдвинулся пиксель (6 px ≈ полный цвет); без тонмаппинга
   const px = vec2(motionTex.x, motionTex.y.negate()).mul(0.5).mul(size); // пиксели, y вниз
   const debugMotion = new THREE.RenderPipeline(renderer, vec4(vec3(px.x.div(6).add(0.5), px.y.div(6).add(0.5), 0.5), 1));
@@ -215,6 +331,9 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
   let frameNo = 0; // номер кадра после сброса истории: от него джиттер
   let parity = 0; // какая из двух историй читается
   const unjittered = new THREE.Matrix4();
+  let rayPhase = 0; // номер сэмпла для шума лучей: от номера кадра после сброса (TAA) или индекса сэмпла (накопление)
+  let raysActive = false, raysCleared = false;
+  let sunDir: Vec3 | null = null, raysK = 0;
   const prevRotVP = new THREE.Matrix4(), curRotVP = new THREE.Matrix4(), tmp = new THREE.Matrix4();
   const rotVP = (camera: THREE.Camera, out: THREE.Matrix4) => {
     tmp.copy(camera.matrixWorldInverse);
@@ -237,6 +356,32 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
     renderer.render(scene, camera);
     renderer.setMRT(null);
     renderer.setRenderTarget(null);
+    if (raysRT) renderRays(camera, w, h);
+  }
+
+  /** Лучи по глубине только что нарисованного сэмпла; не выполняется, если они выключены (или солнце за камерой). */
+  function renderRays(camera: THREE.PerspectiveCamera, w: number, h: number) {
+    const hw = Math.max(1, w >> 1), hh = Math.max(1, h >> 1);
+    if (raysRT!.width !== hw || raysRT!.height !== hh) { raysRT!.setSize(hw, hh); raysCleared = false; }
+    let k = 0;
+    if (raysActive && sunDir) {
+      const sc = sunScreen(sunDir, [camera.position.x, camera.position.y, camera.position.z], camera.matrixWorldInverse.elements, unjittered.elements);
+      if (sc.facing) { ru.sunUv.value.set(sc.u, sc.v); k = raysK * raysFade(sc.off); }
+    }
+    ru.strength.value = k;
+    ru.aspect.value = w / h;
+    ru.phase.value = rayPhase;
+    if (k > 0) {
+      renderer.setRenderTarget(raysRT);
+      raysQuad.render(renderer);
+      renderer.setRenderTarget(null);
+      raysCleared = false;
+    } else if (!raysCleared) {
+      renderer.setRenderTarget(raysRT);
+      renderer.clear();
+      renderer.setRenderTarget(null);
+      raysCleared = true;
+    }
   }
 
   return {
@@ -246,7 +391,7 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
     /** Следующий кадр не следует за предыдущим (склейка, перемотка): история сбрасывается, кадр прогревается. */
     discontinuity() { needReset = true; },
     /** Рисует кадр. size — размер цели в пикселях (совпадает с буфером холста). */
-    render(scene: THREE.Scene, camera: THREE.PerspectiveCamera, sz: { w: number; h: number }) {
+    render(scene: THREE.Scene, camera: THREE.PerspectiveCamera, sz: { w: number; h: number }, post: PostFrame | null = null) {
       const { w, h } = sz;
       if (rt.width !== w || rt.height !== h) {
         rt.setSize(w, h);
@@ -258,12 +403,18 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
       camera.updateMatrixWorld();
       unjittered.copy(camera.projectionMatrix);
       velocity.setProjectionMatrix(mode === 'off' ? null : unjittered); // vector без джиттера
+      const look = opts.post ? post?.look ?? null : null, dof = opts.post ? post?.dof ?? null : null;
+      sunDir = post?.sunDir ?? null;
+      raysActive = !!look && look.rays > 0;
+      raysK = look?.rays ?? 0;
 
       if (mode === 'off') {
+        rayPhase = 0;
         renderScene(scene, camera, w, h, 0, 0);
       } else if (accum) {
         const offs = accumulationOffsets(opts.aa.accumulate);
         offs.forEach(([jx, jy], i) => {
+          rayPhase = i;
           renderScene(scene, camera, w, h, jx, jy);
           accumQuad.material = i === 0 ? accumFirstMat : accumAddMat;
           renderer.setRenderTarget(accumRT);
@@ -275,6 +426,7 @@ export function createFramePipeline(renderer: THREE.WebGPURenderer, opts: Pipeli
 if (needReset) { frameNo = 0; parity = 0; }
         for (let i = 0; i <= warm; i++) {
           const [jx, jy] = taaJitter(frameNo);
+          rayPhase = frameNo;
           renderScene(scene, camera, w, h, jx, jy);
           // небо: поворот камеры между прошлым и этим кадром (без джиттера и переноса)
           rotVP(camera, curRotVP);
@@ -300,10 +452,25 @@ if (needReset) { frameNo = 0; parity = 0; }
       }
       camera.projectionMatrix.copy(unjittered);
       camera.projectionMatrixInverse.copy(unjittered).invert();
-      (debug === 'motion' ? debugMotion : main).render();
+      let out = main;
+      if (opts.post && (look || (dof && dof.strength > 0))) {
+        const l = look ?? { warmth: 0, contrast: 1, saturation: 1, vignette: 0, crop: 'none' as const };
+        pu.warmth.value = l.warmth; pu.contrast.value = l.contrast; pu.saturation.value = l.saturation; pu.vignette.value = l.vignette;
+        const [x0, y0, x1, y1] = cropRect(w, h, l.crop);
+        pu.rect.value.set(x0, y0, x1, y1);
+        const useDof = !!dof && dof.strength > 0;
+        if (useDof) {
+          pu.focus.value = dof.focus; pu.range.value = dof.range; pu.strength.value = dof.strength;
+          pu.near.value = camera.near; pu.far.value = camera.far;
+        }
+        out = lookPipeline(useDof);
+      }
+      (debug === 'motion' ? debugMotion : out).render();
     },
     dispose() {
       rt.dispose(); main.dispose(); debugMotion.dispose();
+      variants.look?.dispose(); variants.lookDof?.dispose();
+      raysRT?.dispose(); raysMat.dispose();
       for (const t of history) t.dispose();
       accumRT?.dispose();
       resolveMat.dispose(); accumFirstMat.dispose(); accumAddMat.dispose();

@@ -129,10 +129,12 @@ export type EntityState = {
   speed: number;
   [k: string]: unknown;
 };
+/** Глубина резкости камеры: расстояние фокуса (м, вдоль взгляда), полуширина зоны резкости (м), сила — макс. радиус нерезкости в пикселях кадра 720p. */
+export type CameraDof = { focus: number; range: number; strength: number };
 export type WorldState = {
   t: number;
   sun: { elevation: number; azimuth: number };
-  camera: { shot: string; pos: Vec3; target: Vec3; fov: number };
+  camera: { shot: string; pos: Vec3; target: Vec3; fov: number; dof?: CameraDof };
   inFrame: string[]; // id сущностей и мест в кадре
   entities: Record<string, EntityState>;
 };
