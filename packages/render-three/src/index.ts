@@ -23,6 +23,8 @@ export interface RenderAdapter {
   setFreeCamera(on: boolean): void;
   /** Отладочный вид вместо кадра: 'motion' — векторы движения цветом. null — обычный кадр. */
   setDebugView(v: DebugView): void;
+  /** Замер GPU-времени последнего render(), мс (нужен trackGpu; null — браузер не умеет). Только для замеров. */
+  gpuMs(): Promise<number | null>;
   dispose(): void;
 }
 
@@ -32,7 +34,7 @@ export const defaultViews: ViewRegistry = Object.fromEntries([TerrainView, Water
  * backend: 'auto' — WebGPU, при его отсутствии WebGL2 (откат делает сам three).
  * 'webgl2' — принудительно WebGL2: скриншот-тесты и серверный рендер.
  */
-export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto' | 'webgl2' } & FrameOptions = {}): RenderAdapter {
+export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto' | 'webgl2'; trackGpu?: boolean } & FrameOptions = {}): RenderAdapter {
   const views = opts.views ?? defaultViews;
   const frame = resolveFrame(opts);
   let pipeline!: ReturnType<typeof createFramePipeline>;
@@ -48,7 +50,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
   return {
     async mount(c, doc, sim) {
       canvas = c;
-      const renderer = new WebGPURenderer({ canvas: c as HTMLCanvasElement, antialias: false, forceWebGL: opts.backend === 'webgl2' });
+      const renderer = new WebGPURenderer({ canvas: c as HTMLCanvasElement, antialias: false, forceWebGL: opts.backend === 'webgl2', trackTimestamp: opts.trackGpu === true });
       await renderer.init();
       renderer.setPixelRatio(frame.pixelRatio);
       pipeline = createFramePipeline(renderer, { samples: frame.samples });
@@ -88,6 +90,11 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       controls?.update();
       const px = frame.pixels({ w, h });
       pipeline.render(three.scene, camera, px);
+    },
+    async gpuMs() {
+      await three.renderer.resolveTimestampsAsync('render');
+      const ms = three.renderer.info.render.timestamp;
+      return ms > 0 ? ms : null;
     },
     setDebugView(v) { debugView = v; pipeline?.setDebug(v); },
     capture: () => createImageBitmap(canvas as HTMLCanvasElement),

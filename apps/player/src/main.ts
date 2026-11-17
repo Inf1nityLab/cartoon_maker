@@ -24,7 +24,8 @@ const backend = params.get('backend') === 'webgl2' ? 'webgl2' : 'auto';
 const film = params.get('film') === '1';
 const filmSize = { w: Number(params.get('w') ?? 1280), h: Number(params.get('h') ?? 720) };
 const FPS = Number(params.get('fps') ?? 30);
-const adapter = createThreeAdapter(film ? { backend, mode: 'film', filmSize, pixelRatio: 1 } : { backend });
+const trackGpu = params.get('gpu') === '1';
+const adapter = createThreeAdapter(film ? { backend, mode: 'film', filmSize, pixelRatio: 1, trackGpu } : { backend, trackGpu });
 // ?debug=motion — векторы движения цветом вместо кадра
 const debug = params.get('debug');
 adapter.setDebugView(debug === 'motion' ? 'motion' : null);
@@ -101,6 +102,8 @@ function frame() {
     t = sec; draw();
     return hashWorldState(engine.state());
   },
+  // ?gpu=1: GPU-время последнего кадра, мс (замеры; в обычной работе не нужен)
+  gpuMs: () => adapter.gpuMs(),
 };
 if (film) draw(); // пауза: первый кадр рисуем сразу
 frame();
