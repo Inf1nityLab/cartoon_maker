@@ -81,14 +81,22 @@ export const Water = defineComponent({
   examples: ["s.world.use('Water', { level: -0.4 })"],
 });
 
-type SkySelf = { elevation: number; azimuth: number; anim: null | { from: number; to: number; t0: number; dur: number } };
+type SkySelf = { elevation: number; azimuth: number };
 
-/** Небо и солнце: высота и азимут, плавный переход. */
+/**
+ * Небо и солнце: высота и азимут вручную. Если в мире есть Forces (силы мира), солнце берётся из часов суток
+ * и эти два числа не используются: Sky только показывает небо (вид — render-three).
+ * Версия 1; высота и азимут теперь ручки (6.7), действие sun — поведение: те же числа в те же моменты, что и раньше.
+ */
 export const Sky = defineComponent<{ elevation: number; azimuth: number }, SkySelf>({
   type: 'Sky',
   version: 1,
-  describe: 'Небо и солнце. Действие sun меняет высоту и азимут (градусы), можно плавно за duration секунд.',
-  params: z.object({ elevation: z.number().min(-10).max(90).default(30), azimuth: z.number().min(0).max(360).default(180) }),
+  describe: 'Небо и солнце. Действие sun меняет высоту и азимут (градусы), можно плавно за duration секунд. Если в мире есть Forces, солнце идёт по часам суток, а эти значения не используются.',
+  params: z.object({
+    elevation: z.number().min(-10).max(90).default(30).describe('высота солнца над горизонтом, ° (если нет Forces)'),
+    azimuth: z.number().min(0).max(360).default(180).describe('азимут солнца, ° (0 — север, +z; 90 — восток, +x) (если нет Forces)'),
+  }),
+  handles: { elevation: { unit: '°' }, azimuth: { unit: '°' } },
   actions: {
     sun: z.object({
       elevation: z.number().min(-10).max(90).optional(),
@@ -96,20 +104,27 @@ export const Sky = defineComponent<{ elevation: number; azimuth: number }, SkySe
       duration: z.number().min(0).max(600).default(0),
     }),
   },
-  create: (_ctx, p) => ({ elevation: p.elevation, azimuth: p.azimuth, anim: null }),
-  step(s, _dt, ctx) {
-    const a = s.anim;
-    if (!a) return;
-    const k = Math.min(1, (ctx.time + ctx.dt - a.t0) / a.dur);
-    s.elevation = a.from + (a.to - a.from) * k;
-    if (k >= 1) s.anim = null;
-  },
-  onAction(s, _n, a, ctx) {
-    if (a.azimuth !== undefined) s.azimuth = a.azimuth;
+  create: (_ctx, p) => ({ elevation: p.elevation, azimuth: p.azimuth }),
+  step() {},
+  // поведение «sun»: азимут сразу, высота сразу или линейно за duration (как было до механизма ручек)
+  onAction(_s, _n, a, ctx) {
+    if (a.azimuth !== undefined) ctx.handles.set('azimuth', a.azimuth);
     if (a.elevation === undefined) return;
-    if (a.duration > 0) s.anim = { from: s.elevation, to: a.elevation, t0: ctx.time, dur: a.duration };
-    else { s.elevation = a.elevation; s.anim = null; }
+    if (a.duration > 0) ctx.handles.to('elevation', a.elevation, { over: a.duration, ease: 'linear' });
+    else ctx.handles.set('elevation', a.elevation);
   },
-  state: (s) => ({ sun: { elevation: s.elevation, azimuth: s.azimuth } }),
-  examples: ['s.world.sun({ elevation: 0.6, duration: 14 })'],
+  state: (s, ctx) => ({ sun: ctx.service('forces')?.sun() ?? { elevation: s.elevation, azimuth: s.azimuth } }),
+  showcase: {
+    kind: 'world', size: 40, eye: 2, ground: 'hills',
+    demos: [{
+      title: 'Солнце: утро, день, закат',
+      duration: 10,
+      steps: [
+        { t: 0, action: 'sun', args: { elevation: 8, azimuth: 100 } },
+        { t: 0.5, action: 'sun', args: { elevation: 55, azimuth: 180, duration: 4 } },
+        { t: 5, action: 'sun', args: { elevation: 1, azimuth: 260, duration: 5 } },
+      ],
+    }],
+  },
+  examples: ['s.world.sun({ elevation: 0.6, duration: 14 })', "sky.to('elevation', 20, { over: 8 })"],
 });

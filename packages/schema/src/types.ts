@@ -137,4 +137,11 @@ export type WorldState = {
   camera: { shot: string; pos: Vec3; target: Vec3; fov: number; dof?: CameraDof };
   inFrame: string[]; // id сущностей и мест в кадре
   entities: Record<string, EntityState>;
+  /** Текущие значения ручек (6.7) — только тех, которых коснулась режиссура (set/to/поведение); у сцен без ручек ключа нет. */
+  handles?: Record<string, Record<string, HandleValue>>;
+  /** Состояние компонентов мира, у которых оно есть (силы мира: ветер, свет, температура…). Ключ — id компонента. */
+  world?: Record<string, { type: string; [k: string]: unknown }>;
+  /** Связи, отключённые режиссёром на отрезке (6.6, перебивка): id компонента → силы. Ключа нет, пока всё включено. */
+  unlinked?: Record<string, string[]>;
 };
+export type HandleValue = number | string | boolean;

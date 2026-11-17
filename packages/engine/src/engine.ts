@@ -1,5 +1,6 @@
-import { hashWorldState, type SceneDoc, type Vec3, type WorldState, type EntityState } from '@cartoon/schema';
-import type { CameraState, ComponentDef, Ctx, EntityHandle, PathSampler, Registry, Services } from './component.ts';
+import { hashWorldState, type HandleValue, type SceneDoc, type Vec3, type WorldState, type EntityState } from '@cartoon/schema';
+import { NO_LIGHT, type CameraState, type ComponentDef, type Ctx, type EntityHandle, type HandleApi, type PathSampler, type Registry, type Services } from './component.ts';
+import { applySteps, checkHandleEvent, evalTrack, handleInfos, HandleSetArgs, HandleToArgs, LinkArgs, type HandleInfo, type HandleStep, type Track } from './handles.ts';
 import { createPath } from './paths.ts';
 import { CameraFocusArgs } from './focus.ts';
 import { rngNext, rngSeed } from './rng.ts';
@@ -12,6 +13,8 @@ type Snapshot = {
   rng: Record<string, number>;
   selves: Record<string, any>;
   camera: CameraSim;
+  tracks: Record<string, Record<string, Track>>;
+  unlinked: Record<string, string[]>;
 };
 
 /** Внутреннее состояние для адаптера рендера. Без three. Только чтение. */
@@ -50,6 +53,12 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
   let selves: Record<string, any> = {};
   let camera!: CameraSim;
   let current: string | null = null; // id компонента, чей rng сейчас доступен
+  // ручки (6.7): дорожки тех, которых коснулась режиссура (в чекпоинте), и значения всех ручек сейчас (выводятся, не хранятся)
+  let tracks: Record<string, Record<string, Track>> = {};
+  let unlinked: Record<string, string[]> = {};
+  let handleVals: Record<string, Record<string, HandleValue>> = {};
+  let infos: Record<string, Record<string, HandleInfo>> = {};
+  let eventT: number | null = null; // время события, пока выполняется его действие (старт кривых поведения)
 
   const time = () => tick * dt;
 
@@ -88,14 +97,64 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
       if (doc.entities[target]) return ctx.entity(target).pos;
       return ctx.place(target);
     },
+    get componentId() {
+      if (!current) throw new Error('ctx.componentId доступен только внутри компонента');
+      return current;
+    },
+    wind: (p) => (heard('wind') && services.forces ? services.forces.wind(p) : [0, 0, 0]),
+    light: (p) => (heard('light') && services.forces ? services.forces.light(p) : NO_LIGHT),
+    temperature: (p) => (heard('temperature') && services.forces ? services.forces.temperature(p) : 15),
+    get timeOfDay() { return services.forces ? services.forces.timeOfDay() : 12; },
+    handles: {
+      set: (name, value) => runSteps(name, [{ to: value, over: 0 }]),
+      to: (name, value, opts) => runSteps(name, [{ to: value, over: opts?.over ?? 1, ...(opts?.ease ? { ease: opts.ease } : {}) }]),
+      seq: (name, steps) => runSteps(name, steps),
+    } satisfies HandleApi,
+    handleOf: (id, name) => handleVals[id]?.[name],
   };
+
+  /** Слышит ли сейчас объект силу (перебивка отключает на отрезке). */
+  function heard(force: string): boolean {
+    return !(current && unlinked[current]?.includes(force));
+  }
+
+  function runSteps(name: string, steps: HandleStep[]): void {
+    if (!current) throw new Error('ctx.handles доступен только внутри действия компонента');
+    applyHandle(current, name, steps, eventT ?? time());
+  }
+
+  /** Применить шаги ручке компонента в момент t; дорожка заводится при первом касании. */
+  function applyHandle(id: string, name: string, steps: HandleStep[], t: number): void {
+    const info = infos[id]?.[name];
+    if (!info) {
+      const def = order.find((o) => o.id === id)?.def;
+      throw new Error(`${id}: у ${def?.type ?? '?'} нет ручки «${name}». Есть: ${Object.keys(infos[id] ?? {}).join(', ') || '— (ручек нет)'}`);
+    }
+    const byId = (tracks[id] ??= {});
+    byId[name] ??= { base: handleVals[id]![name]!, segs: [] };
+    applySteps(byId[name]!, t, info.kind, steps);
+  }
+
+  /** Записать в состояние компонентов значения ручек на текущий момент. */
+  function syncHandles(): void {
+    const t = time();
+    for (const [id, byName] of Object.entries(tracks)) {
+      const def = order.find((o) => o.id === id)!.def;
+      for (const [name, tr] of Object.entries(byName)) {
+        const v = evalTrack(tr, t, infos[id]![name]!.kind);
+        handleVals[id]![name] = v;
+        const h = def.handles![name]!;
+        if (h.apply) h.apply(selves[id], v); else selves[id][name] = v;
+      }
+    }
+  }
 
   function entityHandle(id: string): EntityHandle | undefined {
     const e = doc.entities[id];
     const self = selves[id];
     if (!e || !self) return undefined;
     const def = registry.components[e.type]!;
-    return { id, pos: self.pos, heading: self.heading, state: def.state?.(self) ?? {} };
+    return { id, pos: self.pos, heading: self.heading, state: def.state?.(self, ctx) ?? {} };
   }
 
   function as<T>(id: string, fn: () => T): T {
@@ -114,6 +173,7 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
     services = { heightAt: () => 0, waterLevel: -Infinity };
     paths = Object.fromEntries(Object.entries(d.paths).map(([k, p]) => [k, createPath(p.points as Vec3[], p.closed)]));
     tick = 0; nextEvent = 0; rngState = {}; selves = {}; camera = initCamera(); checkpoints = new Map();
+    tracks = {}; unlinked = {}; handleVals = {}; infos = {};
 
     const entityIds = Object.keys(d.entities).sort(); // стабильный порядок — по id
     order = [
@@ -131,6 +191,10 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
       return { id, def, params: def.params.parse(params), isWorld };
     });
     for (const o of order) {
+      if (o.def.handles) {
+        infos[o.id] = handleInfos(o.def);
+        handleVals[o.id] = Object.fromEntries(Object.keys(infos[o.id]!).map((n) => [n, o.params[n]]).filter(([, v]) => v !== undefined));
+      }
       rngState[o.id] = rngSeed(d.settings.seed, o.id);
       if (o.isWorld) as(o.id, () => o.def.setup?.(ctx, o.params));
     }
@@ -145,16 +209,18 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
       selves[o.id] = as(o.id, () => o.def.create(ctx, o.params, { at, heading: e.spawn.heading }));
     }
     applyEvents();
+    syncHandles();
     updateCamera();
     checkpoints.set(0, snapshot());
   }
 
   function snapshot(): Snapshot {
-    return structuredClone({ tick, nextEvent, rng: rngState, selves, camera });
+    return structuredClone({ tick, nextEvent, rng: rngState, selves, camera, tracks, unlinked });
   }
   function restore(s: Snapshot): void {
     const c = structuredClone(s);
-    tick = c.tick; nextEvent = c.nextEvent; rngState = c.rng; selves = c.selves; camera = c.camera;
+    tick = c.tick; nextEvent = c.nextEvent; rngState = c.rng; selves = c.selves; camera = c.camera; tracks = c.tracks; unlinked = c.unlinked;
+    syncHandles();
   }
 
   function applyEvents(): void {
@@ -177,6 +243,7 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
       camera.start = e.t;
       return;
     }
+    if (e.action === 'handle.set' || e.action === 'handle.to' || e.action === 'link.set') return applyEngineAction(e);
     let o: (typeof order)[number] | undefined;
     if (e.target === 'world') {
       o = order.find((x) => x.isWorld && e.action in x.def.actions);
@@ -188,7 +255,32 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
     const schema = o.def.actions[e.action];
     if (!schema) throw new Error(`${o.def.type}.${e.action}: такого действия нет. Есть: ${Object.keys(o.def.actions).join(', ')}`);
     const args = schema.parse(e.args);
-    as(o.id, () => o.def.onAction?.(selves[o.id], e.action, args, ctx));
+    eventT = e.t;
+    try { as(o.id, () => o.def.onAction?.(selves[o.id], e.action, args, ctx)); } finally { eventT = null; }
+  }
+
+  /** События самого движка: ручки (handle.set / handle.to) и перебивка связи с силой (link.set). Цель — id компонента. */
+  function applyEngineAction(e: SceneDoc['timeline'][number]): void {
+    const o = order.find((x) => x.id === e.target);
+    if (!o) throw new Error(`Событие ${e.id}: ${e.action} требует id компонента в target, получено «${e.target}»`);
+    const bad = checkHandleEvent(o.def, e.action, e.args);
+    if (bad.length) throw new Error(`Событие ${e.id}: ${bad.map(([p, m]) => `${p}: ${m}`).join('; ')}`);
+    if (e.action === 'link.set') {
+      const a = LinkArgs.parse(e.args);
+      const list = (unlinked[o.id] ??= []);
+      const i = list.indexOf(a.force);
+      if (a.on && i >= 0) list.splice(i, 1);
+      else if (!a.on && i < 0) list.push(a.force);
+      if (!list.length) delete unlinked[o.id];
+      return;
+    }
+    if (e.action === 'handle.set') {
+      const a = HandleSetArgs.parse(e.args);
+      applyHandle(o.id, a.handle, [{ to: a.value, over: 0 }], e.t);
+    } else {
+      const a = HandleToArgs.parse(e.args);
+      applyHandle(o.id, a.handle, [{ to: a.value, over: a.over, ease: a.ease }], e.t);
+    }
   }
 
   function updateCamera(): void {
@@ -205,18 +297,22 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
     for (const o of order) as(o.id, () => o.def.step(selves[o.id], dt, ctx));
     tick++;
     applyEvents();
+    syncHandles();
     updateCamera();
     if (tick % cpTicks === 0 && !checkpoints.has(tick)) checkpoints.set(tick, snapshot());
   }
 
   function state(): WorldState {
     const entities: Record<string, EntityState> = {};
+    const world: NonNullable<WorldState['world']> = {};
     let sun = { elevation: 30, azimuth: 180 };
     for (const o of order) {
       const self = selves[o.id];
-      const extra = o.def.state?.(self) ?? {};
+      const extra = as(o.id, () => o.def.state?.(self, ctx)) ?? {};
       if (o.isWorld) {
-        if (extra.sun) sun = extra.sun as typeof sun;
+        const { sun: s, ...rest } = extra;
+        if (s) sun = s as typeof sun;
+        if (Object.keys(rest).length) world[o.id] = { type: o.def.type, ...rest };
       } else {
         entities[o.id] = { type: o.def.type, pos: [...self.pos] as Vec3, heading: self.heading, action: 'standing', speed: 0, ...extra };
       }
@@ -231,6 +327,19 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
       },
       inFrame: inFrame(entities),
       entities,
+      // ключи появляются только когда есть что показать: у сцен без ручек и сил мира хэш прежний
+      ...(Object.keys(world).length ? { world } : {}),
+      ...touched(),
+    };
+  }
+
+  /** Значения ручек, которых коснулась режиссура, и отключённые связи. */
+  function touched(): Pick<WorldState, 'handles' | 'unlinked'> {
+    const handles: NonNullable<WorldState['handles']> = {};
+    for (const [id, byName] of Object.entries(tracks)) handles[id] = Object.fromEntries(Object.keys(byName).sort().map((n) => [n, handleVals[id]![n]!]));
+    return {
+      ...(Object.keys(handles).length ? { handles } : {}),
+      ...(Object.keys(unlinked).length ? { unlinked: structuredClone(unlinked) } : {}),
     };
   }
 

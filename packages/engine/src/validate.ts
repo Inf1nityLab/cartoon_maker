@@ -1,6 +1,7 @@
 import { validateSceneDoc, zodErrors, type SceneDoc } from '@cartoon/schema';
 import type { Registry } from './component.ts';
 import { CameraFocusArgs } from './focus.ts';
+import { checkHandleEvent, isEngineAction } from './handles.ts';
 
 /**
  * Полная проверка для ИИ: структура + параметры компонентов + аргументы событий.
@@ -43,6 +44,15 @@ export function validateAgainstRegistry(raw: unknown, reg: Registry): { ok: true
       const { name: _n, ...rest } = ev.args;
       const r = def.params.safeParse({ ...(inst?.params ?? {}), ...rest });
       if (!r.success) errors.push(...zodErrors(r.error, { ...(inst?.params ?? {}), ...rest }, `${at}.args.`));
+      return;
+    }
+    if (isEngineAction(ev.action)) {
+      // ручки и перебивка: цель — id компонента мира или сущности
+      const inst = doc.world.find((w) => w.id === ev.target) ?? doc.entities[ev.target];
+      if (!inst) return void errors.push(`${at}.target: ${ev.action} требует id компонента, получено «${ev.target}»`);
+      const d = reg.components[inst.type];
+      if (!d) return;
+      for (const [p, m] of checkHandleEvent(d, ev.action, ev.args)) errors.push(`${at}.args.${p}: ${m}`);
       return;
     }
     const defs = ev.target === 'world' ? doc.world.map((w) => reg.components[w.type]).filter(Boolean) : [reg.components[typeOf[ev.target] ?? '']].filter(Boolean);
