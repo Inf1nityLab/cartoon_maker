@@ -403,7 +403,7 @@ export function createThreeAdapter(opts: { views: ViewRegistry; pixelRatio?: num
 
 Рендерер — `WebGPURenderer` из `three/webgpu` с автоматическим откатом на WebGL2 (`backend: 'auto'`). Причина: генераторы окружения Three.js (TerrainGenerator, ForestGenerator, TreeGenerator) используют материалы на узлах (TSL), которые работают только с ним. Свои материалы тоже пишем на TSL (`MeshStandardNodeMaterial`), а не на старых `ShaderMaterial`. Для скриншот-тестов и серверного рендера допустим `backend: 'webgl2'`.
 
-Настройки из reference: `ACESFilmicToneMapping`, тени `PCFShadowMap` (не `PCFSoftShadowMap` — удалён в текущей версии three), тени солнца — каскады `CSMShadowNode` (`render-three/src/light/`): 4 карты 2048² по границам 12/40/130/420 м от камеры, у первого тексел ≈ 1–2 см (≤ 5 см при любом fov), смещения и мягкость PCF считаются от тексела каскада; направление солнца берётся из `Sky` (высота, азимут), рельеф тоже отбрасывает тени, окружение через `PMREMGenerator` из сцены неба (обновлять не чаще раза в 1,2 с или при изменении солнца).
+Настройки из reference: `ACESFilmicToneMapping`, тени `PCFShadowMap` (не `PCFSoftShadowMap` — удалён в текущей версии three), карта теней 2048 следует за целью камеры, окружение через `PMREMGenerator` из сцены неба (обновлять не чаще раза в 1,2 с или при изменении солнца).
 
 ---
 
