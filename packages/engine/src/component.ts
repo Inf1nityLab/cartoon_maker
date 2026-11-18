@@ -57,6 +57,8 @@ export type ForcesField = {
 
 /** Вода как поле (6.5): где она, какой глубины, куда течёт. Даёт компонент Water; только числа и функции. */
 export type WaterField = {
+  /** id компонента Water: в мире можно несколько вод (пруд и ручей), у каждой свой уровень */
+  id: string;
   /** Разобранные параметры воды (с умолчаниями): вид берёт форму и цвета отсюда. */
   config: Record<string, any>;
   /** Центр воды [x, z] и область, в которой считается карта глубины. */
@@ -85,8 +87,11 @@ export type Services = {
   road?: RoadField;
   terrain?: TerrainInfo;
   forces?: ForcesField;
-  water?: WaterField;
+  waters?: WaterField[];
 };
+
+/** Какая вода в точке: id, уровень поверхности, глубина (м). */
+export type WaterHit = { id: string; level: number; depth: number; field: WaterField };
 
 /** Мировые сервисы. Компоненты не ссылаются друг на друга напрямую — только через ctx. */
 export interface Ctx {
@@ -117,6 +122,8 @@ export interface Ctx {
   wind(p: Vec3): Vec3;
   light(p: Vec3): LightAt;
   temperature(p: Vec3): number;
+  /** Вода в точке (x, z): та, где глубже (пруд и ручей рядом — у каждого свой уровень); null — суши. */
+  waterAt(x: number, z: number): WaterHit | null;
   /** Часы суток 0…24 (12 без Forces). */
   readonly timeOfDay: number;
   /** Ручки текущего компонента (6.7): внутри действия — поведение (набор кривых), от момента события. */

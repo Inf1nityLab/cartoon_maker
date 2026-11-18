@@ -104,6 +104,16 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
     wind: (p) => (heard('wind') && services.forces ? services.forces.wind(p) : [0, 0, 0]),
     light: (p) => (heard('light') && services.forces ? services.forces.light(p) : NO_LIGHT),
     temperature: (p) => (heard('temperature') && services.forces ? services.forces.temperature(p) : 15),
+    waterAt(x, z) {
+      let best: ReturnType<Ctx['waterAt']> = null;
+      for (const f of services.waters ?? []) {
+        const l = f.level(x, z);
+        if (l === null) continue;
+        const d = f.depth(x, z);
+        if (!best || d > best.depth) best = { id: f.id, level: l, depth: d, field: f };
+      }
+      return best;
+    },
     get timeOfDay() { return services.forces ? services.forces.timeOfDay() : 12; },
     handles: {
       set: (name, value) => runSteps(name, [{ to: value, over: 0 }]),

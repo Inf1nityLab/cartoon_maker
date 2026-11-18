@@ -55,7 +55,7 @@ type ShotName = 'establishing' | 'follow' | 'lowAngle' | 'orbit' | 'closeup' | '
 export type Director = {
   places(p: Record<string, Vec3>): void;
   path(id: string, p: { points: Vec3[]; closed?: boolean }): void;
-  world: { use(type: string, params?: Record<string, unknown>): EntityHandle; sun(a: Sun): void; look(a: Record<string, unknown>): void; lookPreset(name: string): void };
+  world: { use(type: string, params?: Record<string, unknown>, id?: string): EntityHandle; sun(a: Sun): void; look(a: Record<string, unknown>): void; lookPreset(name: string): void };
   add(type: string, params?: Record<string, unknown>, spawn?: { at: Target; heading?: number; id?: string }): EntityHandle;
   /** Настроение: именованный набор изменений ручек разных объектов (команды set/to/link). Применить: s.at(t).mood(name). */
   mood(name: string, changes: Command[]): void;
@@ -98,8 +98,8 @@ export function buildScene(fn: (s: Director) => void, meta: SceneMeta): SceneDoc
     places: (p) => void Object.assign(doc.places, p),
     path: (id, p) => void (doc.paths[id] = { points: p.points, closed: p.closed ?? false }),
     world: {
-      use(type, params = {}) {
-        const id = type.toLowerCase();
+      use(type, params = {}, idOverride) {
+        const id = idOverride ?? type.toLowerCase();
         doc.world.push({ id, type, version: 1, params });
         return handle(id);
       },

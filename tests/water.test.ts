@@ -31,18 +31,18 @@ describe('Water v2: схема и пресеты', () => {
     expect(w.version).toBe(1);
     const e = makeEngine(doc);
     expect(e.seek(3).world?.water).toBeUndefined(); // в отчёт старая вода не попадает: хэши прежние
-    expect(e.sim().services.water!.config.style).toBe('classic');
+    expect(e.sim().services.waters![0]!.config.style).toBe('classic');
   });
 
   it('режиссёр пишет version 1 и новые параметры: это уже новая вода', () => {
     const doc = lake();
     expect(validateAgainstRegistry(doc, registry).ok).toBe(true);
     const e = makeEngine(doc);
-    expect(e.sim().services.water!.config.style).toBe('realistic'); // миграция не навязала classic
+    expect(e.sim().services.waters![0]!.config.style).toBe('realistic'); // миграция не навязала classic
     expect(e.seek(1).world?.water).toBeDefined();
     // голое { level } от режиссёра версии 1 — по-прежнему старая вода
     const bare = makeEngine(scene((s) => { s.world.use('Terrain', {}); s.world.use('Water', { level: -1 }); }));
-    expect(bare.sim().services.water!.config.style).toBe('classic');
+    expect(bare.sim().services.waters![0]!.config.style).toBe('classic');
   });
 
   it('ручки описаны схемой: единицы, диапазон', () => {
@@ -58,7 +58,7 @@ describe('Water: вода знает место (200 точек)', () => {
   it('чаша: вода там, где рельеф ниже уровня и связан с at; не висит над берегом и не уходит под землю', () => {
     const e = makeEngine(lake());
     e.seek(0);
-    const sv = e.sim().services, w = sv.water!;
+    const sv = e.sim().services, w = sv.waters![0]!;
     const level = -0.4, r = lcg(5), b = w.bounds;
     let wet = 0, dry = 0, shoreNear = 0;
     for (let i = 0; i < 200; i++) {
@@ -89,7 +89,7 @@ describe('Water: вода знает место (200 точек)', () => {
       s.world.use('Water', { shape: 'basin', at: [58, -4], level: 2, reach: 120 });
     }));
     e.seek(0);
-    const w = e.sim().services.water!, hz = e.sim().services.heightAt;
+    const w = e.sim().services.waters![0]!, hz = e.sim().services.heightAt;
     let isolated = 0;
     for (let x = -110; x <= 110; x += 3) for (let z = -110; z <= 110; z += 3) if (hz(x, z) < 2 && w.depth(x, z) === 0 && Math.hypot(x - 58, z + 4) > 100) isolated++;
     expect(isolated).toBeGreaterThan(0); // низины вне связной области остались сухими
@@ -98,7 +98,7 @@ describe('Water: вода знает место (200 точек)', () => {
   it('без at: всё, что ниже уровня (так было в версии 1)', () => {
     const e = makeEngine(scene((s) => { s.world.use('Terrain', { style: 'hills', seed: 7 }); s.world.use('Water', { style: 'realistic', level: 2 }); }));
     e.seek(0);
-    const w = e.sim().services.water!, hz = e.sim().services.heightAt, r = lcg(7);
+    const w = e.sim().services.waters![0]!, hz = e.sim().services.heightAt, r = lcg(7);
     for (let i = 0; i < 200; i++) { const x = (r() - 0.5) * 220, z = (r() - 0.5) * 220; expect(w.depth(x, z) > 0).toBe(hz(x, z) < 2); }
   });
 
@@ -109,8 +109,8 @@ describe('Water: вода знает место (200 точек)', () => {
       s.world.use('Water', { ...preset('river'), path: 'water', width: 7, bank: 3 });
     }));
     e.seek(0);
-    const sv = e.sim().services, w = sv.water!;
-    const path = e.sim().services.water!.config.path as string;
+    const sv = e.sim().services, w = sv.waters![0]!;
+    const path = e.sim().services.waters![0]!.config.path as string;
     expect(path).toBe('water');
     let prev = Infinity;
     const doc = lakeRiverPath();
@@ -246,5 +246,49 @@ describe('Water: круги на воде', () => {
     expect(rings(11)).toBe(0); // всё затихло (жизнь круга 5 с, а робот остановился)
     const a = hashWorldState(makeEngine(doc).seek(7)), b = hashWorldState(makeEngine(mk()).seek(7));
     expect(a).toBe(b);
+  });
+});
+
+describe('Water: несколько вод в одном мире (пруд и ручей)', () => {
+  it('у каждой воды свой id и уровень, ctx.waterAt отвечает по точке, берега совпадают с heightAt', () => {
+    const doc = scene((s) => {
+      s.path('stream', { points: [[40, 0, -70], [55, 0, -30], [45, 0, 20], [60, 0, 70]] });
+      s.world.use('Terrain', { style: 'hills', seed: 7, ...BOWL, size: 240, segments: 384, ground: 'soil' });
+      s.world.use('Water', { ...preset('pond-forest'), level: -0.4 }, 'pond');
+      s.world.use('Water', { ...preset('creek'), path: 'stream', width: 3, bank: 2 }, 'stream');
+    });
+    expect(validateAgainstRegistry(doc, registry).ok).toBe(true);
+    const e = makeEngine(doc);
+    e.seek(1);
+    const sv = e.sim().services;
+    expect(sv.waters!.map((w) => w.id)).toEqual(['pond', 'stream']);
+    const [pond, stream] = sv.waters!;
+    // в центре пруда — пруд, на оси ручья — ручей, их уровни разные
+    const centre = pond!.level(0, 0), axis = stream!.level(55, -30);
+    expect(centre).toBe(-0.4);
+    expect(axis).not.toBeNull();
+    expect(axis).not.toBeCloseTo(centre!, 2);
+    expect(stream!.level(0, 0)).toBeNull();
+    expect(pond!.level(55, -30)).toBeNull();
+    // точка на суше — воды нет
+    const r = lcg(21);
+    let wet = 0, dry = 0;
+    for (let i = 0; i < 200; i++) {
+      const x = (r() - 0.5) * 220, z = (r() - 0.5) * 220;
+      for (const w of [pond!, stream!]) {
+        const d = w.depth(x, z), l = w.level(x, z);
+        if (d > 0) { wet++; expect(sv.heightAt(x, z), `${w.id} (${x.toFixed(1)}, ${z.toFixed(1)})`).toBeLessThan(l!); expect(d).toBeCloseTo(l! - sv.heightAt(x, z), 9); }
+        else { dry++; expect(l === null || sv.heightAt(x, z) >= l - 1e-9).toBe(true); }
+      }
+    }
+    expect(wet).toBeGreaterThan(10);
+    expect(dry).toBeGreaterThan(100);
+    // waterAt: запрос по точке
+    const hit = e.sim().services.waters!.length;
+    expect(hit).toBe(2);
+    // состояние обоих попадает в отчёт
+    const w = e.seek(2).world as any;
+    expect(w.pond.shape).toBe('basin');
+    expect(w.stream.shape).toBe('river');
   });
 });

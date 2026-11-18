@@ -209,6 +209,9 @@ export type WaterSelf = {
   last: Record<string, [number, number]>;
 };
 
+/** Поле воды этого компонента среди всех вод мира. */
+const mine = (ctx: Ctx): WaterField => ctx.service('waters')!.find((w) => w.id === ctx.componentId)!;
+
 const MAX_RINGS = 8, RING_LIFE = 5, RING_STEP = 0.35;
 const RIPPLE_HANDLES = ['waveHeight', 'swell', 'swellDirection', 'ripple', 'rippleBoost', 'windSensitivity', 'flowSpeed', 'flowDirection', 'clarity', 'foam', 'reflection', 'ice', 'shallowColor', 'deepColor'] as const;
 
@@ -371,6 +374,7 @@ export const Water = defineComponent<WaterParams, WaterSelf>({
       return p.at ?? [0, 0];
     };
     const field: WaterField = {
+      id: ctx.componentId,
       config: p as unknown as Record<string, any>,
       get center() { return centre(); },
       get bounds() { return p.shape === 'river' ? river!.bounds : basinBounds(); },
@@ -384,7 +388,7 @@ export const Water = defineComponent<WaterParams, WaterSelf>({
         return [Math.sin(a), Math.cos(a)];
       },
     };
-    ctx.provide('water', field);
+    ctx.provide('waters', [...(ctx.service('waters') ?? []), field]);
   },
   create(_ctx, p) {
     const s = {} as WaterSelf;
@@ -392,8 +396,9 @@ export const Water = defineComponent<WaterParams, WaterSelf>({
     return Object.assign(s, { windSpeed: 0, windDir: 0, temp: 15, iceEff: p.ice, drift: 0, rings: [], last: {} });
   },
   step(self, dt, ctx) {
-    const p = ctx.service('water')!.config as WaterParams;
-    const c = ctx.service('water')!.center;
+    const water = mine(ctx);
+    const p = water.config as WaterParams;
+    const c = water.center;
     const probe: Vec3 = [c[0], p.level, c[1]];
     const w = ctx.wind(probe);
     self.windSpeed = Math.hypot(w[0], w[2]);
@@ -402,7 +407,6 @@ export const Water = defineComponent<WaterParams, WaterSelf>({
     self.iceEff = iceNow(self.ice, self.temp, p);
     self.drift += self.flowSpeed * (1 - self.iceEff) * dt;
     // круги от тех, кто касается воды
-    const water = ctx.service('water')!;
     for (const id of p.touchers) {
       let pos: Vec3;
       try { pos = ctx.entity(id).pos; } catch { continue; }
@@ -450,7 +454,7 @@ export const Water = defineComponent<WaterParams, WaterSelf>({
     1: (p: Record<string, unknown>) => (Object.keys(p).every((k) => k === 'level' || k === 'color') ? { style: 'classic', report: false, ...p } : p),
   },
   state(self, ctx) {
-    const p = ctx.service('water')?.config as WaterParams | undefined;
+    const p = mine(ctx)?.config as WaterParams | undefined;
     if (!p || !p.report) return {};
     const sea = seaOf(self, p.swellLength);
     return {

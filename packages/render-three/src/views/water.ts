@@ -302,7 +302,7 @@ export const WaterView = defineView<Handle>('Water', {
   mount(three, inst) {
     const h = empty();
     const sv = three.sim().services;
-    const water = sv.water;
+    const water = sv.waters?.find((w) => w.id === inst.id);
     const cfg = water ? (WaterParams.parse(water.config)) : null;
     if (!water || !cfg || cfg.style === 'classic') {
       const mesh = new THREE.Mesh(
