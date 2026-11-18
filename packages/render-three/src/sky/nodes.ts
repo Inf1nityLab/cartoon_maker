@@ -21,7 +21,7 @@ function makeUniforms() {
   return {
     zenith: col(), horizon: col(), glow: col(), haze: col(), hazeK: uniform(0), fogAmount: uniform(0),
     sunDir: v3(0, 1, 0), sunDisk: col(),
-    moonDir: v3(0, -1, 0), moonRight: v3(1, 0, 0), moonUp: v3(0, 0, 1), moonLightDir: v3(0, 0, 1), moonDisk: uniform(0), moonColor: col(),
+    moonDir: v3(0, -1, 0), moonRight: v3(1, 0, 0), moonUp: v3(0, 0, 1), moonLightDir: v3(0, 0, 1), moonDisk: uniform(0), moonHalo: uniform(1), moonColor: col(),
     starK: uniform(0), starX: v3(1, 0, 0), starY: v3(0, 1, 0), starZ: v3(0, 0, 1),
     cloudCover: uniform(0), cloudOffset: uniform(new THREE.Vector2()), cloudLit: col(), cloudShade: col(),
   };
@@ -89,7 +89,7 @@ export function createSky() {
     const albedo = mix(float(1.0), float(0.45), maria).mul(float(0.85).add(nz.mul(0.15)));
     const body = u.moonColor.mul(albedo).mul(lit.add(0.03)).mul(1.15).mul(disc);
     const m = max(mc, 0);
-    const halo = u.moonColor.mul(pow(m, 600).mul(0.16).add(pow(m, 40).mul(0.02)));
+    const halo = u.moonColor.mul(pow(m, 600).mul(0.16).add(pow(m, 40).mul(0.02))).mul(u.moonHalo);
     return body.add(halo).mul(u.moonDisk);
   };
 
@@ -148,7 +148,7 @@ export function applyLook(u: SkyUniforms, look: SkyLook, cloudOffset: [number, n
   u.hazeK.value = look.hazeK; u.fogAmount.value = fogAmount;
   setV(u.sunDir.value as THREE.Vector3, look.sunDir); setC(u.sunDisk.value as THREE.Color, look.sunDisk);
   setV(u.moonDir.value as THREE.Vector3, look.moonDir); setV(u.moonRight.value as THREE.Vector3, look.moonRight); setV(u.moonUp.value as THREE.Vector3, look.moonUp);
-  setV(u.moonLightDir.value as THREE.Vector3, look.moonLightDir); u.moonDisk.value = look.moonDisk; setC(u.moonColor.value as THREE.Color, look.moonColor);
+  setV(u.moonLightDir.value as THREE.Vector3, look.moonLightDir); u.moonDisk.value = look.moonDisk; u.moonHalo.value = look.moonHalo; setC(u.moonColor.value as THREE.Color, look.moonColor);
   u.starK.value = look.starK;
   setV(u.starX.value as THREE.Vector3, look.starRot[0]); setV(u.starY.value as THREE.Vector3, look.starRot[1]); setV(u.starZ.value as THREE.Vector3, look.starRot[2]);
   u.cloudCover.value = look.cloudCover; (u.cloudOffset.value as THREE.Vector2).set(cloudOffset[0], cloudOffset[1]);

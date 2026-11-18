@@ -179,13 +179,6 @@ export const Forces = defineComponent({
   showcase: {
     kind: 'world', size: 40, eye: 1.5, ground: 'hills',
     demos: [{
-      title: 'Сутки за 20 с (через полночь)',
-      duration: 22,
-      steps: [
-        { t: 0, action: 'handle.set', args: { handle: 'time', value: 5 } },
-        { t: 0.5, action: 'handle.to', args: { handle: 'time', value: 29, over: 20, ease: 'linear' } },
-      ],
-    }, {
       title: 'Закат за 12 с, порыв ветра, облака',
       duration: 14,
       steps: [
@@ -194,6 +187,13 @@ export const Forces = defineComponent({
         { t: 3, action: 'gust', args: { strength: 9, duration: 3 } },
         { t: 6, action: 'handle.to', args: { handle: 'cloudiness', value: 0.8, over: 6, ease: 'linear' } },
         { t: 9, action: 'handle.to', args: { handle: 'time', value: 23, over: 4, ease: 'ease-in' } },
+      ],
+    }, {
+      title: 'Сутки за 20 с (через полночь)',
+      duration: 22,
+      steps: [
+        { t: 0, action: 'handle.set', args: { handle: 'time', value: 5 } },
+        { t: 0.5, action: 'handle.to', args: { handle: 'time', value: 29, over: 20, ease: 'linear' } },
       ],
     }],
   },

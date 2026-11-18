@@ -13,6 +13,7 @@ const shot = async (name: string, query: string, t = 1) => {
   const s = await coldShot(lib(query), t, t - DT);
   keep(`${PFX}-${name}`, s.png);
   expect(s.errors, name).toEqual([]);
+  expect({ w: s.w, h: s.h }, `${name}: размер холста`).toEqual({ w: W, h: H });
   return s;
 };
 
@@ -49,9 +50,9 @@ test.describe('небо и свет (Б5)', () => {
 
   test('сутки за 20 с через полночь (демо): 22 → 00 → 02 → 04 ч', async () => {
     const h = new Set<string>();
-    // демо 0 витрины: time = 5 в t=0, затем линейно до 29 (05:00 следующих суток) за 20 с, начиная с t=0.5
-    for (const [name, t, view] of [['22h', 14.58, 'az=150&pitch=30'], ['00h', 16.58, 'az=180&pitch=35'], ['02h', 18.58, 'az=216&pitch=30'], ['04h', 20.58, 'az=250&pitch=12']] as const)
-      h.add((await shot(`midnight-${name}`, `demo=0&${view}&clouds=0.2`, t)).hash);
+    // демо 1 витрины: time = 5 в t=0, затем линейно до 29 (05:00 следующих суток) за 20 с, начиная с t=0.5
+    for (const [name, t, view] of [['22h', 14.67, 'az=150&pitch=30'], ['00h', 16.33, 'az=180&pitch=35'], ['02h', 18, 'az=216&pitch=30'], ['04h', 19.67, 'az=250&pitch=12']] as const)
+      h.add((await shot(`midnight-${name}`, `demo=1&${view}&clouds=0.2`, t)).hash);
     expect(h.size).toBe(4);
   });
 
@@ -72,7 +73,7 @@ test.describe('небо и свет (Б5)', () => {
       const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));
-      await openPlayer(page, '/library.html?backend=webgl2&film=1&w=320&h=180&object=Forces&demo=0&time=5');
+      await openPlayer(page, '/library.html?backend=webgl2&film=1&w=320&h=180&object=Forces&demo=1&time=5');
       const r = await page.evaluate(() => {
         const p = (window as unknown as { __player: { show(s: number): string; step(s: number): string; shaderBuilds(): number } }).__player;
         p.show(0.5);
@@ -81,8 +82,8 @@ test.describe('небо и свет (Б5)', () => {
         // быстрый проход по суткам с закатом, ночью и рассветом: меняются только униформы
         for (let t = 1; t <= 21; t += 0.5) p.step(t);
         const afterPlay = p.shaderBuilds();
-        p.show(16.58); // перемотка в полночь
-        for (let i = 1; i <= 3; i++) p.step(16.58 + i / 30);
+        p.show(16.33); // перемотка в полночь
+        for (let i = 1; i <= 3; i++) p.step(16.33 + i / 30);
         return { warm, afterPlay, afterSeek: p.shaderBuilds() };
       });
       expect(errors).toEqual([]);

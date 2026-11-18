@@ -83,7 +83,7 @@ export type SkyLook = {
   zenith: Rgb; horizon: Rgb; glow: Rgb; haze: Rgb;
   hazeK: number;
   sunDir: Vec3; sunDisk: Rgb;
-  moonDir: Vec3; moonRight: Vec3; moonUp: Vec3; moonLightDir: Vec3; moonDisk: number; moonColor: Rgb;
+  moonDir: Vec3; moonRight: Vec3; moonUp: Vec3; moonLightDir: Vec3; moonDisk: number; moonHalo: number; moonColor: Rgb;
   starK: number; starRot: [Vec3, Vec3, Vec3];
   cloudCover: number; cloudLit: Rgb; cloudShade: Rgb;
   /** Главный направленный свет: солнце или (ночью) луна. */
@@ -210,7 +210,7 @@ export function skyLook(input: SkyInput): SkyLook {
   return {
     zenith, horizon, glow, haze, hazeK,
     sunDir: sunTrue, sunDisk: scale3(sunLight, 55),
-    moonDir, moonRight, moonUp, moonLightDir, moonDisk, moonColor,
+    moonDir, moonRight, moonUp, moonLightDir, moonDisk, moonHalo: 0.12 + 0.88 * input.moonPhase, moonColor,
     starK, starRot: starRotation(input.time),
     cloudCover: cloud, cloudLit, cloudShade,
     keyDir, keyColor, keyIntensity,
