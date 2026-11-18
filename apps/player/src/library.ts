@@ -9,7 +9,7 @@ import { hashWorldState, type SceneDoc, type TimelineEvent, type Vec3 } from '@c
  * Витрина объектов: library.html?object=<тип>[&preset=…][&time=<часы>]. Каркас для всех объектов мира:
  * слева пресеты и облик, справа ручки из схемы (с единицами и описанием в подсказке), сверху силы мира,
  * внизу время и демо ручек. Сам объект ничего не знает про витрину, кроме `showcase` в своём компоненте.
- * Параметры URL (для e2e): object, preset, time, t, view, wind, winddir, clouds, fog, gust=<t>, demo=<номер>, film=1&w=&h=,
+ * Параметры URL (для e2e): object, touch=1 (Water: робот въезжает в воду, круги), dive=<t> (нырнуть с секунды t), dy=<высота под водой, м>, preset, time, t, view, wind, winddir, clouds, fog, gust=<t>, demo=<номер>, film=1&w=&h=,
  * p.<параметр>=<значение> (параметры и ручки объекта), backend=webgl2.
  */
 
@@ -89,11 +89,18 @@ function build(): SceneDoc {
     if (objectName === 'Sky') s.world.use('Sky', params);
     else { s.world.use('Sky', {}); s.world.use('Forces', objectName === 'Forces' ? params : forcesParams); }
     if (objectName === 'Road') { s.path('road', { points: [[-45, 0, -22], [-14, 0, -6], [10, 0, 3], [45, 0, 30]] }); s.world.use('Road', params); }
-    else if (show.kind === 'world' && !['Terrain', 'Sky', 'Forces'].includes(objectName)) s.world.use(objectName, params);
+    else if (show.kind === 'world' && !['Terrain', 'Sky', 'Forces'].includes(objectName)) s.world.use(objectName, objectName === 'Water' && q.has('touch') ? { ...params, touchers: ['rover'] } : params);
+    if (objectName === 'Water' && q.has('touch')) {
+      // робот въезжает в мелководье: от него идут круги (touch=1)
+      s.places({ rover0: [-13, 0, -10], rover1: [3, 0, -6] });
+      const rover = s.add('Robot', {}, { at: 'rover0', heading: 90, id: 'rover' });
+      s.at(0.5).do(rover.roll({ to: 'rover1', speed: 0.7 }));
+    }
     if (show.kind === 'entity') { s.places({ center: [0, 0, 0] }); s.add(objectName, params, { at: 'center', heading: 175, id: objId }); }
     const v = viewShot(viewName);
     s.at(0).camera.shot('fixed', { at: v.at, look: v.look, fov: v.fov, aboveGround: !v.abs });
-    const dv = setupOf()?.views?.dive;
+    const dv0 = setupOf()?.views?.dive;
+    const dv = dv0 && q.has('dy') ? { ...dv0, at: [dv0.at[0], num(q.get('dy'), dv0.at[1]), dv0.at[2]] as [number, number, number] } : dv0;
     if (diveAt !== null && dv && v.abs) {
       // нырнуть: плавно под воду, подержать, вернуться
       const dsh = { fov: dv.fov ?? 55, aboveGround: false } as const;
