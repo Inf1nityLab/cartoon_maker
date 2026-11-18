@@ -92,4 +92,16 @@ test.describe('небо и свет (Б5)', () => {
       expect(r.afterSeek).toBe(r.warm);
     } finally { await browser.close(); }
   });
+
+  test('рельеф Б3 под золотым часом (18.2 ч): дюны, морской пляж, зимний луг', async () => {
+    const h = new Set<string>();
+    for (const [name, view] of [['desert-dunes', 'view=general'], ['sea-beach', 'view=general'], ['winter-meadow', 'view=general']] as const) {
+      const s = await coldShot(`/library.html?backend=webgl2&film=1&w=${W}&h=${H}&object=Terrain&preset=${name}&${view}&time=18.2&clouds=0.25`, 1, 1 - DT);
+      keep(`terrain-under-sky-${name}`, s.png);
+      expect(s.errors, name).toEqual([]);
+      expect({ w: s.w, h: s.h }, name).toEqual({ w: W, h: H });
+      h.add(s.hash);
+    }
+    expect(h.size).toBe(3);
+  });
 });
