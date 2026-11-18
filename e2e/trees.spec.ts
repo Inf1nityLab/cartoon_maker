@@ -153,6 +153,7 @@ test.describe('деревья (Б2): ветер', () => {
       windTaaVsAccum16: stats(taa, ref), windNoAA: stats(off, ref), windTaaWithoutPrevPosition: stats(noPrev, ref),
       calmTaaVsAccum16: stats(taaCalm, refCalm), calmFrameToFrame: stats(taaCalm, next),
     };
+    mkdirSync(OUT, { recursive: true });
     writeFileSync(`${OUT}/taa-wind-vs-accum16.json`, JSON.stringify(r, null, 2));
     // шлейфа нет: на ветру TAA ошибается лишь немного больше, чем на безветрии, и заметно меньше, чем без положения вершин в прошлом кадре
     expect(r.windTaaVsAccum16.meanAbs, 'ветер против безветрия').toBeLessThan(r.calmTaaVsAccum16.meanAbs + 1.5);

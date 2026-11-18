@@ -10,7 +10,9 @@ import { Tree } from './tree/index.ts';
 import { Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed, Glide } from './shots.ts';
 
 export const registry = createRegistry([Terrain, Water, Sky, Forces, Road, Multiped, FilmLook, Robot, Tree], [Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed, Glide]);
-export { Terrain, Sky, terrainHeight, TerrainParams } from './world.ts';
+export { Terrain, Sky, terrainHeight, TerrainParams, frostFactor, type TerrainSelf } from './world.ts';
+export { duneField, beachHeight, beachInland, sandWeight, bowlProfile } from './terrain-forms.ts';
+export { bakeSurfaceMap, SURFACE_FAR, type SurfaceMap, type Crown } from './surface-map.ts';
 export { Water, WaterParams, seaOf, iceNow, type WaterSelf, type Ring } from './water.ts';
 export { waveModes, waveHeightAt, seaState, windAzimuth, LAYER_COUNT, GRAVITY, type WaveMode, type SeaState, type SeaLayer, type SeaInput, type WaveLayerName } from './water-waves.ts';
 export { Multiped } from './multiped.ts';

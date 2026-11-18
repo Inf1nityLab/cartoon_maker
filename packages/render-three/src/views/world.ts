@@ -1,25 +1,38 @@
 import * as THREE from 'three';
-import { defineView } from '../view.ts';
-import { gridIndices, gridNormals, gridStep, sampleGrid } from '@cartoon/components';
+import { defineView, type ThreeCtx } from '../view.ts';
+import { bakeSurfaceMap, gridIndices, gridNormals, gridStep, sampleGrid, TerrainParams, type Crown, type TerrainSelf } from '@cartoon/components';
 import type { WorldState } from '@cartoon/schema';
 import { fogColorAt, skyLook, type SkyInput } from '../light/sky.ts';
 import { applyLook } from '../sky/nodes.ts';
 import { dayK, sunLevels, sunVector } from '../light/math.ts';
-import { createGroundMaterial } from '../ground/material.ts';
+import { createGroundMaterial, type SurfaceUniforms } from '../ground/material.ts';
 
 const lerpColor = (a: THREE.Color, b: THREE.Color, t: number) => a.clone().lerp(b, Math.max(0, Math.min(1, t)));
 const NIGHT = new THREE.Color('#0a1226'), DUSK = new THREE.Color('#ff8a4c'), DAY = new THREE.Color('#8ec1ee');
 const SUN_LOW = new THREE.Color('#ff9a5a'), SUN_HIGH = new THREE.Color('#fff4e0');
 
-/** Цвет неба по высоте солнца: ночь → закат → день (прежний путь, сцены без Forces). */
-function legacySkyColor(elevation: number): THREE.Color {
-  if (elevation >= 14) return DAY.clone();
-  if (elevation >= 0) return lerpColor(DUSK, DAY, elevation / 14);
-  return lerpColor(DUSK, NIGHT, -elevation / 8);
+/** Цвет неба по высоте солнца: ночь → закат → день (прежний путь, сцены без Forces). Пишет в out, новых Color на кадре нет. */
+function legacySkyColor(out: THREE.Color, elevation: number): THREE.Color {
+  if (elevation >= 14) return out.copy(DAY);
+  if (elevation >= 0) return out.copy(DUSK).lerp(DAY, Math.max(0, Math.min(1, elevation / 14)));
+  return out.copy(DUSK).lerp(NIGHT, Math.max(0, Math.min(1, -elevation / 8)));
 }
 
-export const TerrainView = defineView('Terrain', {
-  mount(three) {
+type TerrainHandle = { mesh: THREE.Mesh; u?: SurfaceUniforms };
+
+/** Кроны деревьев сцены для подстилки: центр, радиус (по высоте дерева). */
+function crownsOf(three: ThreeCtx): Crown[] {
+  const out: Crown[] = [];
+  for (const c of Object.values(three.sim().components)) {
+    if (c.type !== 'Tree') continue;
+    const s = c.self as { pos: [number, number, number]; height: number; girth: number };
+    out.push({ x: s.pos[0], z: s.pos[2], r: Math.max(1.2, s.height * 0.5 * s.girth) });
+  }
+  return out;
+}
+
+export const TerrainView = defineView<TerrainHandle>('Terrain', {
+  mount(three, inst) {
     const { heightAt, waterLevel, terrain, road } = three.sim().services;
     if (!terrain) throw new Error('Terrain: в services нет terrain (компонент не прошёл setup)');
     // та же сетка и те же треугольники, по которым Terrain считает ctx.heightAt (components/terrain-grid.ts)
@@ -32,7 +45,21 @@ export const TerrainView = defineView('Terrain', {
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setIndex(new THREE.BufferAttribute(gridIndices(spec), 1));
     let material: THREE.Material;
-    if (terrain.ground === 'soil') {
+    let u: SurfaceUniforms | undefined;
+    if (terrain.ground === 'surfaces') {
+      // поверхности по месту: песок, подстилка и берег читают карту, посчитанную на CPU теми же функциями, что и логика
+      geo.setAttribute('normal', new THREE.BufferAttribute(gridNormals(spec, heights), 3));
+      const p = TerrainParams.parse(inst.params);
+      const waters = three.sim().services.waters ?? [];
+      const sm = bakeSurfaceMap(p, spec.size, waters, p.litter > 0 && p.litterArea === 'trees' ? crownsOf(three) : []);
+      const half = THREE.DataUtils.toHalfFloat, data = new Uint16Array(sm.data.length);
+      for (let k = 0; k < data.length; k++) data[k] = half(sm.data[k]!);
+      const map = new THREE.DataTexture(data, sm.n, sm.n, THREE.RGBAFormat, THREE.HalfFloatType);
+      map.minFilter = map.magFilter = THREE.LinearFilter; map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping; map.generateMipmaps = false; map.needsUpdate = true;
+      const sandy = p.base === 'sand' || (p.base === 'auto' && (p.style === 'dunes' || p.style === 'beach'));
+      material = createGroundMaterial({ seed: terrain.seed, road, surface: { map, size: spec.size, hasWater: sm.hasWater, windDirection: p.windDirection, sand: sandy, litter: p.litter > 0, shoreSand: p.shoreSand } });
+      u = (material as unknown as { surfaceUniforms: SurfaceUniforms }).surfaceUniforms;
+    } else if (terrain.ground === 'soil') {
       geo.setAttribute('normal', new THREE.BufferAttribute(gridNormals(spec, heights), 3));
       material = createGroundMaterial({ seed: terrain.seed, road });
     } else {
@@ -52,10 +79,14 @@ export const TerrainView = defineView('Terrain', {
     mesh.receiveShadow = true;
     mesh.castShadow = true; // тени рельефа: холмы затеняют низины
     three.scene.add(mesh);
-    return mesh;
+    return { mesh, u };
   },
-  sync() {},
-  dispose(mesh, three) { three.scene.remove(mesh); mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose(); },
+  // снег, влажность и рябь — только униформы: шейдер не пересобирается
+  sync(h, self: TerrainSelf) {
+    if (!h.u) return;
+    h.u.snow.value = self.cover; h.u.wet.value = self.wetness; h.u.ripple.value = self.sandRipple;
+  },
+  dispose(h, three) { three.scene.remove(h.mesh); h.mesh.geometry.dispose(); (h.mesh.material as THREE.Material).dispose(); },
 });
 
 type ForcesView = {
@@ -99,7 +130,7 @@ export const SkyView = defineView('Sky', {
       // прежний расчёт по высоте солнца; униформы неба заполняем только для воды, которая отражает небо
       const { elevation, azimuth } = state.sun;
       applyLook(three.sky.u, skyLook(skyInput(state, undefined)), [state.t * 0.004, state.t * 0.0015], 0);
-      h.bg.copy(legacySkyColor(elevation));
+      legacySkyColor(h.bg, elevation);
       three.scene.background = h.bg;
       if (three.scene.fog instanceof THREE.Fog) three.scene.fog.color.copy(h.bg);
       else three.scene.fog = new THREE.Fog(h.bg, 60, 320);
