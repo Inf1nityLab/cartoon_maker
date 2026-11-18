@@ -167,7 +167,7 @@ function surfaceMaterial(u: U, map: WaterMap, open: boolean): THREE.NodeMaterial
     // поглощение по каналам: красный гаснет первым, дно уходит в бирюзу и синеву; kScale растёт с мутностью
     const Tc = exp(vec3(0.55, 0.13, 0.07).mul(u.kScale).mul(depth.div(max(cosV, 0.3))).negate());
     const T = Tc.y;
-    const mixD = float(1).sub(exp(depth.mul(u.kScale).mul(0.5).negate()));
+    const mixD = float(1).sub(exp(depth.mul(u.kScale).mul(0.8).negate()));
     const bodyCol = mix(u.shallow, u.deep, mixD).mul(u.light).mul(0.85);
     const sandCol = u.bed.mul(u.light).mul(0.42);
     const sandK = u.bedBlend.mul(exp(depth.mul(u.kScale).mul(0.3).negate())); // песок виден до глубины, дальше — только вода

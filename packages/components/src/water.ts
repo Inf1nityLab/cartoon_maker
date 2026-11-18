@@ -247,7 +247,7 @@ export const Water = defineComponent<WaterParams, WaterSelf>({
   describe: 'Вода: пруд, озеро, ручей, река, океан, оазис. Знает место: заполняет ложбину до уровня (береговая линия по ctx.heightAt, глубина и цвет по глубине) или идёт по пути с руслом (река). Волны слоями (зыбь, ветровые, рябь), пена, каустики на дне, лёд, подводный вид. Слушает ветер и температуру сил мира. Ручки: waveHeight, swell, ripple, windSensitivity, flowSpeed, clarity, foam, reflection, ice, цвета. Поведения: ripple, storm, calm, freeze, thaw, splash. Для реки объявлять после Terrain и Road.',
   params: WaterParams,
   presets: {
-    'ocean-tropical': WaterParams.parse({ shape: 'basin', open: true, level: 0, at: [-190, 0], reach: 400, shallowColor: '#58d6c8', deepColor: '#05466e', bedColor: '#d8c490', bedBlend: 0.9, clarity: 0.9, swell: 0.9, swellLength: 55, swellDirection: 90, waveHeight: 0.15, ripple: 0.25, windSensitivity: 0.7, foam: 0.6, reflection: 0.6, deepDepth: 60 }),
+    'ocean-tropical': WaterParams.parse({ shape: 'basin', open: true, level: 0, at: [-190, 0], reach: 400, shallowColor: '#3fc2b8', deepColor: '#03355a', bedColor: '#d8c490', bedBlend: 0.9, clarity: 0.9, swell: 0.9, swellLength: 55, swellDirection: 90, waveHeight: 0.15, ripple: 0.7, windSensitivity: 0.7, foam: 0.6, reflection: 0.6, deepDepth: 60 }),
     'ocean-storm': WaterParams.parse({ shape: 'basin', open: true, level: 0, at: [-190, 0], reach: 400, shallowColor: '#6f9a95', deepColor: '#16323f', bedColor: '#b9a77f', bedBlend: 0.9, clarity: 0.3, swell: 3.6, swellLength: 90, swellDirection: 90, waveHeight: 1.6, ripple: 0.5, windSensitivity: 1, foam: 1, reflection: 0.7, deepDepth: 60 }),
     'lake-mountain': WaterParams.parse({ shape: 'basin', level: -0.4, at: [0, 0], reach: 80, shallowColor: '#3fa0b4', deepColor: '#0b3552', clarity: 0.85, ripple: 0.2, windSensitivity: 0.2, foam: 0.25, reflection: 1, temperatureSensitivity: 1, freezeAt: -2 }),
     'pond-forest': WaterParams.parse({ shape: 'basin', level: -0.4, at: [0, 0], reach: 80, shallowColor: '#5d8f55', deepColor: '#1e3b2c', clarity: 0.3, ripple: 0.18, windSensitivity: 0.12, foam: 0.2, reflection: 0.85, temperatureSensitivity: 1, freezeAt: 0 }),
@@ -257,7 +257,7 @@ export const Water = defineComponent<WaterParams, WaterSelf>({
     }),
     creek: WaterParams.parse({ shape: 'river', path: 'water', width: 2.4, bank: 1.6, depth: 0.45, smooth: 14, level: 0, shallowColor: '#86bcae', deepColor: '#2c6064', bedColor: '#9a8a6a', bedBlend: 0.5, clarity: 0.8, flowSpeed: 0.9, ripple: 0.5, windSensitivity: 0.05, foam: 0.5, reflection: 0.7 }),
     river: WaterParams.parse({ shape: 'river', path: 'water', width: 9, bank: 4, depth: 2.2, smooth: 30, level: 0, shallowColor: '#79966a', deepColor: '#2a4538', clarity: 0.4, flowSpeed: 1.7, ripple: 0.35, windSensitivity: 0.2, foam: 0.35, reflection: 0.8 }),
-    oasis: WaterParams.parse({ shape: 'basin', level: -0.4, at: [0, 0], reach: 80, shallowColor: '#37cbc9', deepColor: '#0a6a99', bedColor: '#e6cf9b', bedBlend: 0.65, clarity: 0.75, ripple: 0.1, windSensitivity: 0.1, foam: 0.1, reflection: 1 }),
+    oasis: WaterParams.parse({ shape: 'basin', level: -0.4, at: [0, 0], reach: 80, shallowColor: '#1d9dc2', deepColor: '#05508a', bedColor: '#e6cf9b', bedBlend: 0.65, clarity: 0.75, ripple: 0.3, windSensitivity: 0.1, foam: 0.1, reflection: 1 }),
   },
   handles: {
     waveHeight: { unit: 'м' }, swell: { unit: 'м' }, swellDirection: { unit: '°' }, ripple: {}, rippleBoost: {}, windSensitivity: {},
