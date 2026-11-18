@@ -9,7 +9,7 @@
 | three | 0.187.0 | MIT | только `packages/render-three` (рендер, WebGPU/WebGL2, OrbitControls) | https://github.com/mrdoob/three.js |
 | zod | 4.x | MIT | схемы документов и параметров компонентов | https://github.com/colinhacks/zod |
 | meshoptimizer | 1.3.0 | MIT (© 2016–2026 Arseny Kapoulkine; LICENSE.md пакета этой версии проверен) | только `packages/render-three`: упрощение и кодирование кластеров в nanite-lib | https://github.com/zeux/meshoptimizer |
-| @dgreenheck/ez-tree | 1.1.0 | MIT (© 2024 Daniel Greenheck; LICENSE пакета этой версии проверен) | только `packages/render-three`: генерация деревьев; его картинки коры и листьев (`src/lib/assets`) берём из самого пакета | https://github.com/dgreenheck/ez-tree |
+| @dgreenheck/ez-tree | 1.1.0 | MIT (© 2024 Daniel Greenheck; LICENSE пакета этой версии проверен) | только `packages/render-three`: генерация деревьев; его картинки коры и листьев (`src/lib/assets`) берём из самого пакета; числа его готовых наборов (Oak/Ash/Aspen/Pine Medium, Bush 1–3) перенесены данными в `packages/components/src/tree/recipes.ts` | https://github.com/dgreenheck/ez-tree |
 
 ## Только инструменты разработки
 

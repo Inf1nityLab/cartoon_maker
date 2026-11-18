@@ -175,7 +175,7 @@ export type ComponentDef<P = any, S extends object = any> = {
 };
 
 /** Шаг демо-показа: событие для самого объекта. action — 'handle.set', 'handle.to' или действие компонента. */
-export type DemoStep = { t: number; action: string; args: Record<string, unknown>; /** id другого компонента мира (например 'forces'); по умолчанию — сам объект */ target?: string };
+export type DemoStep = { t: number; action: string; args: Record<string, unknown>; /** true — событие для силы мира (компонент Forces витрины), а не для самого объекта */ world?: true; /** id другого компонента мира (например 'forces'); по умолчанию — сам объект */ target?: string };
 export type Demo = { title: string; duration: number; steps: DemoStep[] };
 
 /** Сцена вокруг объекта мира в витрине: свой рельеф, путь и камеры (под пресет). Только данные. */
@@ -198,6 +198,8 @@ export type Showcase = {
   eye?: number;
   /** Земля под объектом: плоская (по умолчанию) или холмы. */
   ground?: 'flat' | 'hills';
+  /** Пресеты для «семейной фотографии»: все в ряд одним кадром (library.html?family=1). Только для kind entity. */
+  family?: string[];
   /** Короткие показы ручек во времени, 8–15 с. Первый — основной. */
   demos?: Demo[];
   /** Пресет, с которого открывается витрина (по умолчанию первый) */

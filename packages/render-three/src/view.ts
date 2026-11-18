@@ -14,6 +14,8 @@ export type ThreeCtx = {
 
 /** Контракт вида: логика компонента не знает про меши, вид только рисует по состоянию. */
 export type ViewDef<H = any> = {
+  /** Асинхронная подготовка (картинки) до первого кадра: adapter.mount ждёт её у всех видов сцены. */
+  preload?(): Promise<void>;
   mount(three: ThreeCtx, inst: ComponentInstance): H;
   sync(handle: H, self: any, three: ThreeCtx, state: WorldState): void;
   /** Необязательно: после sync всех видов кадра (вода переопределяет туман и фон под водой поверх неба). */

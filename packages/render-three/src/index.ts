@@ -10,6 +10,7 @@ import { sunVector } from './light/math.ts';
 import type { DofSettings, LookSettings, PostFrame } from './frame/post.ts';
 import { MultipedView } from './views/multiped.ts';
 import { RobotView } from './views/robot.ts';
+import { TreeView } from './views/tree.ts';
 import { SkyView, TerrainView } from './views/world.ts';
 import { WaterView } from './views/water.ts';
 import { createSunShadow, type CascadeInfo } from './light/sunShadow.ts';
@@ -49,7 +50,7 @@ export interface RenderAdapter {
   dispose(): void;
 }
 
-export const defaultViews: ViewRegistry = Object.fromEntries([TerrainView, WaterView, SkyView, MultipedView, RobotView]) as ViewRegistry;
+export const defaultViews: ViewRegistry = Object.fromEntries([TerrainView, WaterView, SkyView, MultipedView, RobotView, TreeView]) as ViewRegistry;
 
 /**
  * backend: 'auto' — WebGPU, при его отсутствии WebGL2 (откат делает сам three).
@@ -97,6 +98,8 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       sunShadow = createSunShadow(sunLight, renderer, camera);
       probe = createProbe(scene);
       probe.set(probeOpts);
+      const types = new Set([...doc.world, ...Object.values(doc.entities)].map((i) => i.type));
+      await Promise.all([...types].map((t) => views[t]?.preload?.()));
       for (const inst of [...doc.world, ...Object.values(doc.entities)]) {
         const view = views[inst.type];
         if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst) });
