@@ -87,10 +87,10 @@ export const RECIPES: Record<Species, TreeRecipe> = {
   },
   // ива (наша; приём из пруда с уткой: ствол с наклоном, ветви дугой вверх и наружу, потом тонкие плети вниз). Тонкие ветви гнутся книзу сильнее толстых: сила (отрицательная — от вертикали) делится на радиус
   willow: {
-    evergreen: false, bark: 'willow', barkTint: 0xcfc3a2, barkScale: [1, 6], levels: 2, angle: [52, 38, 30], children: [9, 12, 3], force: -0.034,
-    gnarliness: [0.09, 0.07, 0.05, 0.02], length: [26, 17, 20, 4], radius: [1.5, 0.55, 0.12, 0.1], sections: [10, 9, 9, 5], segments: [8, 6, 3, 3],
-    start: [0.45, 0.25, 0], taper: [0.55, 0.6, 0.7, 0.7], twist: [0.06, 0, 0, 0],
-    leaf: 'ash', leafAngle: 20, leafCount: 20, leafStart: 0.1, leafSize: 1.5, leafVariance: 0.5, sway: { gain: 1.3, freq: 0.4 },
+    evergreen: false, bark: 'willow', barkTint: 0xcfc3a2, barkScale: [1, 6], levels: 2, angle: [42, 18, 30], children: [14, 20, 3], force: -0.05,
+    gnarliness: [0.07, 0.07, 0.05, 0.02], length: [15, 12, 24, 4], radius: [3.4, 0.36, 0.14, 0.1], sections: [8, 9, 10, 5], segments: [8, 6, 3, 3],
+    start: [0.55, 0.2, 0], taper: [0.45, 0.4, 0.3, 0.7], twist: [0.06, 0, 0, 0],
+    leaf: 'ash', leafAngle: 20, leafCount: 30, leafStart: 0.05, leafSize: 1.8, leafVariance: 0.5, sway: { gain: 1.3, freq: 0.4 },
   },
 };
 

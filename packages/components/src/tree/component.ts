@@ -71,7 +71,7 @@ export const Tree = defineComponent<TreeParams, TreeSelf>({
     }),
   },
   showcase: {
-    kind: 'entity', size: 12, eye: 5, ground: 'flat',
+    kind: 'entity', size: 5, eye: 5, ground: 'flat',
     family: ['oak', 'ash', 'aspen', 'birch', 'pine', 'spruce', 'willow', 'bush1'],
     demos: [{
       title: 'Лето, осень, листопад, голое, снег — за 15 с при поднимающемся ветре',
