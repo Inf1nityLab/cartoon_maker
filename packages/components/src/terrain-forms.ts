@@ -53,7 +53,7 @@ export function duneField(p: TerrainParams, x: number, z: number): number {
 export function beachInland(p: TerrainParams, x: number, z: number): number {
   const a = p.shoreAngle * RAD, nx = Math.sin(a), nz = Math.cos(a);
   const q = x * nx + z * nz, along = x * nz - z * nx;
-  const wobble = 5.5 * fbm(along / 40, q / 70 + 0.5, p.seed + 21, 3) + 1.2 * valueNoise(along / 9, q / 25, p.seed + 22);
+  const wobble = 9 * fbm(along / 45, q / 70 + 0.5, p.seed + 21, 3) + 1.2 * valueNoise(along / 9, q / 25, p.seed + 22);
   return -q + wobble;
 }
 

@@ -80,9 +80,9 @@ test.describe('рельеф и поверхности (Б3)', () => {
     const l: number[] = [];
     for (const [i, w] of [0, 0.5, 1].entries()) l.push(luma((await shot(`wetness-${i}`, `preset=meadow-hills&view=close&time=11&p.wetness=${w}`)).px));
     expect(l[1]).toBeLessThan(l[0]!); expect(l[2]).toBeLessThan(l[1]!);
-    const h = new Set<string>();
-    for (const [i, r] of [0, 0.5, 1].entries()) h.add((await shot(`ripple-${i}`, `preset=desert-dunes&view=ground&time=17.2&p.sandRipple=${r}`)).hash);
-    expect(h.size).toBe(3);
+    const px: Buffer[] = [];
+    for (const [i, r] of [0, 0.5, 1].entries()) px.push((await shot(`ripple-${i}`, `preset=desert-dunes&view=ground&time=17.2&p.sandRipple=${r}`)).px);
+    expect(share(px[0]!, px[1]!)).toBeGreaterThan(0.05); expect(share(px[1]!, px[2]!)).toBeGreaterThan(0.05); // ручка меняет только рябь: хэш мира тот же, пиксели разные
   });
 
   test('демо: оттепель → снегопад на лугу, 5 кадров', async () => {

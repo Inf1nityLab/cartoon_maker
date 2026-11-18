@@ -11,10 +11,10 @@ export interface HandleBase {
   link(force: Force): Command;
 }
 
-/** Рельеф: холмы (fbm-шум) и впадина озера. Предоставляет ctx.heightAt(x, z): поверхность сетки, по которой нарисована земля; под Road рельеф выровнен. */
+/** Рельеф и поверхности: холмы, дюны (гребни поперёк ветра, рябь песка), пляж и чаша под воду (пологий или крутой берег). С ground: surfaces земля знает место: песок сухой и мокрый у воды, подстилка из листьев под деревьями, снег (ложится в мороз, на крутых склонах меньше, тает в тепле), влажность. Предоставляет ctx.heightAt(x, z): поверхность сетки, по которой нарисована земля; под Road рельеф выровнен. Ручки: snow, wetness, sandRipple. Поведения: snowfall, thaw. Слушает силы мира: температуру. */
 export interface TerrainParams {
-  /** по умолчанию "hills" */
-  style?: "hills" | "flat";
+  /** форма: hills — холмы, flat — плоско, dunes — дюны (гребни поперёк ветра), beach — пляж (море с одной стороны, суша с другой); по умолчанию "hills" */
+  style?: "hills" | "flat" | "dunes" | "beach";
   /** по умолчанию 7 */
   seed?: number;
   /** от 0; до 40; по умолчанию 7 */
@@ -26,7 +26,7 @@ export interface TerrainParams {
   /** от 32; до 640; по умолчанию 384 */
   segments?: number;
   /** по умолчанию "soil" */
-  ground?: "lowpoly" | "soil";
+  ground?: "lowpoly" | "soil" | "surfaces";
   /** по умолчанию {"at":[58,-4],"radius":28,"depth":12} */
   lake?: {
     at: [number, number];
@@ -35,12 +35,65 @@ export interface TerrainParams {
     /** от 0; до 30 */
     depth: number;
   };
+  /** берег чаши: smooth — как прежде, gentle — пологий с ровным дном, steep — обрыв; по умолчанию "smooth" */
+  bank?: "smooth" | "gentle" | "steep";
+  /** высота дюн, м (style: dunes); от 0.5; до 40; по умолчанию 6 */
+  duneHeight?: number;
+  /** шаг между гребнями дюн, м (style: dunes); от 10; до 300; по умолчанию 60 */
+  duneSpacing?: number;
+  /** куда дует ветер, который сложил дюны и рябь песка, ° (0 — на север, +z; 90 — на восток, +x); гребни поперёк; от 0; до 360; по умолчанию 90 */
+  windDirection?: number;
+  /** где море (style: beach): направление от суши к воде, ° (0 — на +z, 90 — на +x); от 0; до 360; по умолчанию 0 */
+  shoreAngle?: number;
+  /** ширина пляжа от воды до травы или дюн, м (style: beach); от 2; до 80; по умолчанию 14 */
+  beachWidth?: number;
+  /** уклон пляжа и дна, м/м (style: beach); от 0.01; до 0.4; по умолчанию 0.055 */
+  beachSlope?: number;
+  /** основа поверхности (ground: surfaces): auto — по форме (дюны и пляж — песок, холмы — луг), meadow — луг, sand — песок; по умолчанию "auto" */
+  base?: "auto" | "meadow" | "sand";
+  /** полоса песка у воды на любой форме (берег пруда), 0 — нет (ground: surfaces); от 0; до 1; по умолчанию 0 */
+  shoreSand?: number;
+  /** лесная подстилка из листьев: 0 нет, 1 сплошная (ground: surfaces); от 0; до 1; по умолчанию 0 */
+  litter?: number;
+  /** где подстилка: trees — под и вокруг деревьев сцены, all — на всей земле (лесная земля); по умолчанию "trees" */
+  litterArea?: "trees" | "all";
+  /** снег 0…1: ложится только в мороз (температура из сил мира), на крутых склонах меньше; тает в тепле (ground: surfaces); от 0; до 1; по умолчанию 0 */
+  snow?: number;
+  /** влажность земли 0…1: темнеет и блестит (ground: surfaces); у воды мокрый песок виден и без неё; от 0; до 1; по умолчанию 0 */
+  wetness?: number;
+  /** рябь песка, поперёк ветра: 0 гладкий, 1 заметные волны (ground: surfaces); от 0; до 1; по умолчанию 0.6 */
+  sandRipple?: number;
 }
-/** Пресеты Terrain: hills, plain, bowl, soft */
-export type TerrainPreset = "hills" | "plain" | "bowl" | "soft";
-export type Terrain = HandleBase;
+/** Пресеты Terrain: hills, plain, bowl, soft, meadow-hills, desert-dunes, pond-shore, sea-beach, forest-glade, winter-meadow */
+export type TerrainPreset = "hills" | "plain" | "bowl" | "soft" | "meadow-hills" | "desert-dunes" | "pond-shore" | "sea-beach" | "forest-glade" | "winter-meadow";
+export interface Terrain extends HandleBase {
+  /** действие snowfall */
+  snowfall(args?: {
+    /** за сколько секунд снег доходит до нужной глубины, с; от 0.5; до 3600; по умолчанию 8 */
+    over?: number;
+    /** сколько снега выпадет, 0…1 (ляжет только в мороз); от 0; до 1; по умолчанию 1 */
+    to?: number;
+  }): Command;
+  /** действие thaw */
+  thaw(args?: {
+    /** за сколько секунд снег сходит, с; от 0.5; до 3600; по умолчанию 8 */
+    over?: number;
+  }): Command;
+  /** Ручка «snow»: снег 0…1: ложится только в мороз (температура из сил мира), на крутых склонах меньше; тает в тепле (ground: surfaces). Диапазон 0…1. */
+  set(handle: "snow", value: number): Command;
+  to(handle: "snow", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «wetness»: влажность земли 0…1: темнеет и блестит (ground: surfaces); у воды мокрый песок виден и без неё. Диапазон 0…1. */
+  set(handle: "wetness", value: number): Command;
+  to(handle: "wetness", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «sandRipple»: рябь песка, поперёк ветра: 0 гладкий, 1 заметные волны (ground: surfaces). Диапазон 0…1. */
+  set(handle: "sandRipple", value: number): Command;
+  to(handle: "sandRipple", value: number, opts?: { over?: number; ease?: Ease }): Command;
+}
 /* Примеры:
  *   s.world.use('Terrain', { style: 'hills', seed: 7 })
+ *   s.world.use('Terrain', { style: 'dunes', ground: 'surfaces', duneHeight: 7, windDirection: 90 })
+ *   const ground = s.world.use('Terrain', { ground: 'surfaces' }); s.at(10).do(ground.snowfall({ over: 8 }))   // ляжет, если в Forces мороз
+ *   s.at(30).do(ground.thaw({ over: 10 }))
  */
 
 /** Вода: пруд, озеро, ручей, река, океан, оазис. Знает место: заполняет ложбину до уровня (береговая линия по ctx.heightAt, глубина и цвет по глубине) или идёт по пути с руслом (река). Волны слоями (зыбь, ветровые, рябь), пена, каустики на дне, лёд, подводный вид. Слушает ветер и температуру сил мира. Ручки: waveHeight, swell, ripple, windSensitivity, flowSpeed, clarity, foam, reflection, ice, цвета. Поведения: ripple, storm, calm, freeze, thaw, splash. Для реки объявлять после Terrain и Road. */

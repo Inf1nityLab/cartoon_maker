@@ -189,9 +189,9 @@ function draw(jump = false) {
 const clock = (h: number) => { const m = Math.round(h * 60) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
 
 /** Параметры или ручки изменились: пересобрать сцену. remount — если меняется то, что вид читает только при создании (облик). */
-function rebuild(remount: boolean) {
+async function rebuild(remount: boolean) {
   if (!load()) return;
-  if (remount) adapter.remount(doc);
+  if (remount) await adapter.remount(doc);
   draw(true);
 }
 

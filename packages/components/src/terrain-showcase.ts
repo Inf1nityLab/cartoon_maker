@@ -53,7 +53,7 @@ export const TERRAIN_SETUPS: Record<string, ShowSetup> = {
     views: {
       general: { at: [-42, 8, -44], look: [0, -0.5, 0], fov: 46, abs: true },
       close: { at: [-22, 2.2, -22], look: [0, -0.6, 2], fov: 45, abs: true },
-      ground: { at: [-17, 0.5, -15], look: [0, -0.4, 4], fov: 60, abs: true },
+      ground: { at: [-8, 1, -33], look: [0, 0.2, -18], fov: 60 },
       top: { at: [0, 80, -2], look: [0, 0, 0], fov: 50, abs: true },
     },
   },
@@ -63,7 +63,7 @@ export const TERRAIN_SETUPS: Record<string, ShowSetup> = {
     views: {
       general: { at: [16, 5.5, -46], look: [-18, -0.5, 2], fov: 55, abs: true },
       close: { at: [8, 2.4, -18], look: [-14, 0, 2], fov: 48, abs: true },
-      ground: { at: [10, 0.5, -8], look: [-14, 0, 2], fov: 62, abs: true },
+      ground: { at: [12, 0.8, -24], look: [-6, 0.2, -6], fov: 60 },
       top: { at: [-20, 100, 0], look: [-20, 0, 0], fov: 50, abs: true },
     },
   },
@@ -75,8 +75,8 @@ export const TERRAIN_SETUPS: Record<string, ShowSetup> = {
     forces: { time: 14 },
     views: {
       general: { at: [-6, 5, -34], look: [0, 3, 2], fov: 48, abs: true },
-      close: { at: [-2, 2.2, -16], look: [0, 0.4, 0], fov: 45, abs: true },
-      ground: { at: [0, 0.5, -10], look: [0, 0.3, 3], fov: 60, abs: true },
+      close: { at: [-2, 1.6, -16], look: [0, 0.4, 0], fov: 45 },
+      ground: { at: [0, 0.55, -10], look: [0, 0.3, 3], fov: 60 },
       top: { at: [0, 70, -4], look: [0, 0, 0], fov: 50, abs: true },
     },
   },

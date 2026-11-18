@@ -46,7 +46,8 @@ export interface RenderAdapter {
    * Пересобрать виды под новый документ без пересоздания рендерера (витрина объектов: смена пресета и облика).
    * Набор компонентов с FilmLook-ом не должен меняться (проходы кадра выбираются при mount).
    */
-  remount(doc: SceneDoc): void;
+  /** Пересобрать виды под новый документ (облик сменился). Асинхронно: картинки видов, которых раньше в сцене не было, догружаются. */
+  remount(doc: SceneDoc): Promise<void>;
   dispose(): void;
 }
 
@@ -105,9 +106,11 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
         if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst) });
       }
     },
-    remount(doc) {
+    async remount(doc) {
       for (const m of mounted) m.view.dispose(m.handle, three);
       mounted.length = 0;
+      const types = new Set([...doc.world, ...Object.values(doc.entities)].map((i) => i.type));
+      await Promise.all([...types].map((t) => views[t]?.preload?.())); // пресет мог добавить деревья, которых не было при первом mount
       for (const inst of [...doc.world, ...Object.values(doc.entities)]) {
         const view = views[inst.type];
         if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst) });

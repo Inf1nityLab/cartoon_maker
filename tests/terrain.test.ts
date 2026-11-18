@@ -111,7 +111,7 @@ describe('Terrain: формы', () => {
     expect(slope('steep')).toBeGreaterThan(slope('smooth') * 1.3);
     expect(slope('gentle')).toBeLessThan(slope('smooth'));
     const old = TerrainParams.parse({ amplitude: 7 }), smooth = TerrainParams.parse({ amplitude: 7, bank: 'smooth' });
-    for (const [x, z] in [[3, 4], [58, -4], [40, 10]] as unknown as [number, number][]) expect(terrainHeight(smooth, x, z)).toBe(terrainHeight(old, x, z));
+    for (const [x, z] of [[3, 4], [58, -4], [40, 10]] as [number, number][]) expect(terrainHeight(smooth, x, z)).toBe(terrainHeight(old, x, z));
   });
 
   it('пляж: море — ниже нуля, суша — выше, берег около нуля; поворот shoreAngle переносит море', () => {
@@ -213,7 +213,7 @@ describe('Terrain: снег и влажность — ручки и связи �
       s.at(1).do(t.to('wetness', 1, { over: 4 }));
     });
     const e = makeEngine(doc);
-    const w = (t: number) => (e.seek(t).world?.terrain as { wetness: number }).wetness;
+    const w = (t: number) => (e.seek(t).world?.terrain as unknown as { wetness: number }).wetness;
     expect(w(0)).toBe(0); expect(w(3)).toBeGreaterThan(0.2); expect(w(3)).toBeLessThan(0.9); expect(w(6)).toBe(1);
   });
 
