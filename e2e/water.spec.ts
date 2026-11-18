@@ -7,7 +7,7 @@ import { ARGS, BASE, openPlayer } from './capture.ts';
 
 // Задача Б1: вода. Кадры для глаз — в test-results/B1-keep (Playwright чистит test-results при старте, поэтому пишем из тестов).
 // Эталонов-картинок нет: смотрим глазами и проверяем числами (хэши, различие кадров, ошибки консоли).
-const OUT = 'test-results/B1-keep';
+const OUT = 'artifacts/B1';
 const W = 1280, H = 720, DT = 1 / 30;
 const lib = (extra: string) => `/library.html?backend=webgl2&film=1&w=${W}&h=${H}&object=Water&${extra}`;
 const keep = (name: string, png: Buffer) => { mkdirSync(OUT, { recursive: true }); writeFileSync(`${OUT}/${name}.png`, png); };
