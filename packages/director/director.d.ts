@@ -406,6 +406,77 @@ export interface Robot extends HandleBase {
  *   robot.startle({ intensity: 1 })
  */
 
+/** Дерево или куст одного семейства (на ez-tree): дуб, ясень, осина, берёза, сосна, ель, кусты, ива — пресеты одного рецепта; seed делает каждое дерево своим. Растёт (age), меняется по сезонам (season: весна, лето, жёлтая и красная осень, голое, зима), сбрасывает листья (shed, shedLeaves), покрывается снегом (snow, тает в тепле), качается от ветра (берёза сильнее дуба; windSensitivity). Ручки: age, season, snow, shed, windSensitivity. Слушает силы мира: ветер, температура. */
+export interface TreeParams {
+  /** рецепт породы: oak дуб, ash ясень, aspen осина, birch берёза, pine сосна, spruce ель, bush1–3 кусты, willow ива; по умолчанию "oak" */
+  species?: "oak" | "ash" | "aspen" | "birch" | "pine" | "spruce" | "bush1" | "bush2" | "bush3" | "willow";
+  /** зерно: у каждого дерева свой рисунок ветвей при той же породе; от 0; до 999999; по умолчанию 35729 */
+  seed?: number;
+  /** рост взрослого дерева, м (в возрасте 0.5); от 0.3; до 60; по умолчанию 12 */
+  height?: number;
+  /** толщина ствола, множитель; от 0.4; до 2.5; по умолчанию 1 */
+  trunk?: number;
+  /** сколько ветвей, множитель; от 0.3; до 2; по умолчанию 1 */
+  branching?: number;
+  /** раскрытие ветвей: добавка к углу ветвей, °; от -30; до 40; по умолчанию 0 */
+  spread?: number;
+  /** кривизна ствола и ветвей, множитель; от 0; до 3; по умолчанию 1 */
+  crooked?: number;
+  /** размер листьев, множитель; от 0.4; до 2.5; по умолчанию 1 */
+  leafSize?: number;
+  /** густота кроны (листьев на веточку), множитель; от 0.2; до 1.5; по умолчанию 1 */
+  leafCount?: number;
+  /** оттенок коры (белый — как у породы); по умолчанию "#ffffff" */
+  barkTint?: string /* '#rrggbb' */;
+  /** цвет листвы летом; по умолчанию "#4a7a2a" */
+  leafColor?: string /* '#rrggbb' */;
+  /** цвет листвы осенью (часть листьев краснее); по умолчанию "#d98a1c" */
+  autumnColor?: string /* '#rrggbb' */;
+  /** возраст: 0 саженец, 0.5 взрослое дерево, 1 старое (шире, реже крона); от 0; до 1; по умолчанию 0.5 */
+  age?: number;
+  /** сезон: 0 весна, 0.3 лето, 0.5 осень (жёлтая, красная), 0.8 листья опали, 1 зима; от 0; до 1; по умолчанию 0.3 */
+  season?: number;
+  /** снег на ветвях и листьях (тает при температуре выше нуля); от 0; до 1; по умолчанию 0 */
+  snow?: number;
+  /** листопад: доля листьев, что уже опала; от 0; до 1; по умолчанию 0 */
+  shed?: number;
+  /** чувствительность к ветру: 0 стоит, 1 как у породы (берёза качается сильнее дуба), 3 флюгер; от 0; до 3; по умолчанию 1 */
+  windSensitivity?: number;
+}
+/** Пресеты Tree: oak, ash, aspen, birch, pine, spruce, bush1, bush2, bush3, willow */
+export type TreePreset = "oak" | "ash" | "aspen" | "birch" | "pine" | "spruce" | "bush1" | "bush2" | "bush3" | "willow";
+export interface Tree extends HandleBase {
+  /** действие shedLeaves */
+  shedLeaves(args?: {
+    /** за сколько секунд опадает листва, с; от 0.5; до 600; по умолчанию 6 */
+    over?: number;
+    /** сколько листьев должно опасть к концу, доля; от 0; до 1; по умолчанию 1 */
+    to?: number;
+  }): Command;
+  /** Ручка «age»: возраст: 0 саженец, 0.5 взрослое дерево, 1 старое (шире, реже крона). Диапазон 0…1. */
+  set(handle: "age", value: number): Command;
+  to(handle: "age", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «season»: сезон: 0 весна, 0.3 лето, 0.5 осень (жёлтая, красная), 0.8 листья опали, 1 зима. Диапазон 0…1. */
+  set(handle: "season", value: number): Command;
+  to(handle: "season", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «snow»: снег на ветвях и листьях (тает при температуре выше нуля). Диапазон 0…1. */
+  set(handle: "snow", value: number): Command;
+  to(handle: "snow", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «shed»: листопад: доля листьев, что уже опала. Диапазон 0…1. */
+  set(handle: "shed", value: number): Command;
+  to(handle: "shed", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «windSensitivity»: чувствительность к ветру: 0 стоит, 1 как у породы (берёза качается сильнее дуба), 3 флюгер. Диапазон 0…3. */
+  set(handle: "windSensitivity", value: number): Command;
+  to(handle: "windSensitivity", value: number, opts?: { over?: number; ease?: Ease }): Command;
+}
+/* Примеры:
+ *   const oak = s.add('Tree', { species: 'oak', seed: 7, height: 12 }, { at: 'meadow' })
+ *   s.at(5).do(oak.to("season", 0.58, { over: 20 }))   // лето → осень
+ *   s.at(25).do(oak.shedLeaves({ over: 8 }))   // листопад
+ *   s.at(40).do(oak.to("snow", 1, { over: 6 }))   // снег ложится, если холодно
+ *   birch.set("windSensitivity", 2)   // чутче к ветру
+ */
+
 /** кадр «establishing»: Общий план: высоко и далеко, сзади-сбоку. Показывает, где происходит действие. */
 export type EstablishingShotArgs = {
   target: string | [number, number, number];
@@ -549,4 +620,5 @@ export interface Components {
   Multiped: { params: MultipedParams; handle: Multiped };
   FilmLook: { params: FilmLookParams; handle: FilmLook };
   Robot: { params: RobotParams; handle: Robot };
+  Tree: { params: TreeParams; handle: Tree };
 }

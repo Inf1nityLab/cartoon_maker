@@ -148,7 +148,7 @@ export type ComponentDef<P = any, S extends object = any> = {
 };
 
 /** Шаг демо-показа: событие для самого объекта. action — 'handle.set', 'handle.to' или действие компонента. */
-export type DemoStep = { t: number; action: string; args: Record<string, unknown> };
+export type DemoStep = { t: number; action: string; args: Record<string, unknown>; /** true — событие для силы мира (компонент Forces витрины), а не для самого объекта */ world?: true };
 export type Demo = { title: string; duration: number; steps: DemoStep[] };
 
 /** Подсказки витрине: какого размера объект, где он (в мире или сам по себе) и что умеет показать. */
