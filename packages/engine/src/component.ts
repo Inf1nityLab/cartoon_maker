@@ -24,7 +24,7 @@ export type RoadField = {
 };
 
 /** Параметры сетки рельефа, по которой нарисована земля: вид берёт их отсюда, а не из сырых params (там нет умолчаний). */
-export type TerrainInfo = { size: number; segments: number; ground: 'lowpoly' | 'soil'; seed: number };
+export type TerrainInfo = { size: number; segments: number; ground: 'lowpoly' | 'soil' | 'surfaces'; seed: number };
 
 /** Сколько света в точке (6.6): доли относительно полного солнца в зените / полной луны. Всё в 0…1. */
 export type LightAt = {
@@ -186,6 +186,12 @@ export type ShowSetup = {
   path?: [number, number, number][];
   /** Именованные виды: at и look — [x, высота, z]; abs — высоты абсолютные, иначе над землёй; dive — вид «под водой» для кнопки «нырнуть» */
   views?: Record<string, { at: [number, number, number]; look: [number, number, number]; fov?: number; abs?: boolean }>;
+  /** Другие компоненты мира рядом (вода у берега). Если задано (даже пустым), витрина Terrain не добавляет воду по умолчанию */
+  world?: { type: string; params: Record<string, unknown> }[];
+  /** Сущности на сцене (деревья в лесной поляне): at — [x, z], на землю ставится сама */
+  entities?: { type: string; params?: Record<string, unknown>; at: [number, number]; heading?: number }[];
+  /** Силы мира при открытии пресета (температура, время…) поверх умолчаний витрины */
+  forces?: Record<string, unknown>;
 };
 
 /** Подсказки витрине: какого размера объект, где он (в мире или сам по себе) и что умеет показать. */
