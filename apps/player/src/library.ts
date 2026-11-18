@@ -9,7 +9,7 @@ import { hashWorldState, type SceneDoc, type TimelineEvent, type Vec3 } from '@c
  * Витрина объектов: library.html?object=<тип>[&preset=…][&time=<часы>]. Каркас для всех объектов мира:
  * слева пресеты и облик, справа ручки из схемы (с единицами и описанием в подсказке), сверху силы мира,
  * внизу время и демо ручек. Сам объект ничего не знает про витрину, кроме `showcase` в своём компоненте.
- * Параметры URL (для e2e): object, preset, time, t, view, family=1, wind, winddir, clouds, fog, temp, gust=<t>, demo=<номер>, film=1&w=&h=,
+ * Параметры URL (для e2e): object, preset, time, t, view, zoom (масштаб камеры, <1 ближе), family=1, wind, winddir, clouds, fog, temp, gust=<t>, demo=<номер>, film=1&w=&h=,
  * p.<параметр>=<значение> (параметры и ручки объекта), backend=webgl2.
  */
 
@@ -65,7 +65,7 @@ const FAMILY_GAP = show.size * 1.8;
 /** Камера витрины: именованные виды считаются от размера объекта (showcase.size) и высоты взгляда (showcase.eye). */
 function viewShot(name: string): { at: Vec3; look: Vec3; fov: number } {
   // объект меняет размер вместе с параметром height (если он есть): камера держит его в кадре
-  const k = typeof params.height === 'number' && typeof defaultsOf.height === 'number' ? Math.max(0.06, params.height / defaultsOf.height) : 1;
+  const k = (typeof params.height === 'number' && typeof defaultsOf.height === 'number' ? Math.max(0.06, params.height / defaultsOf.height) : 1) * num(q.get('zoom'), 1);
   const far = show.kind === 'world' ? 0.4 : 1; // объекты мира снимаются ближе, относительно их размера
   if (name === 'family') { // все породы в ряд: камера на таком расстоянии, чтобы вошёл весь ряд
     const width = (familyNames.length - 1) * FAMILY_GAP + show.size * 1.6, eye = show.eye ?? show.size / 2;
@@ -96,7 +96,7 @@ function build(): SceneDoc {
       familyNames.forEach((name, i) => {
         const x = (i - (familyNames.length - 1) / 2) * FAMILY_GAP;
         s.places({ [`f${i}`]: [x, 0, 0] });
-        const p = { ...(def.params as unknown as { parse(x: unknown): Params }).parse(ALL_PRESETS[name]), ...over };
+        const p = { ...(def!.params as unknown as { parse(x: unknown): Params }).parse(ALL_PRESETS[name]), ...over };
         s.add(objectName, p, { at: `f${i}`, heading: 175, id: i === 0 ? objId : `${objId}-${name}` });
       });
     } else if (show.kind === 'entity') { s.places({ center: [0, 0, 0] }); s.add(objectName, params, { at: 'center', heading: 175, id: objId }); }

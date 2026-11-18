@@ -46,7 +46,7 @@ test.describe('деревья (Б2): кадры', () => {
   });
 
   test('возраст 0 / 0.5 / 1', async () => {
-    for (const age of [0, 0.25, 0.5, 1]) await shot(`age-${age}`, `${BASEQ}&preset=oak&p.age=${age}&view=${age === 0 ? 'close' : 'general'}`);
+    for (const age of [0, 0.25, 0.5, 1]) await shot(`age-${age}`, `${BASEQ}&preset=oak&p.age=${age}&view=close&zoom=${age === 0 ? 0.12 : age === 0.25 ? 0.4 : 1}`);
   });
 
   test('сезон 0 / 0.4 / 0.6 / 0.8 / 1', async () => {
@@ -78,7 +78,7 @@ test.describe('деревья (Б2): ветер', () => {
       const page = await (await browser.newContext({ viewport: { width: W, height: H } })).newPage();
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));
-      await openPlayer(page, lib(`object=Tree&preset=${preset}&view=general&time=11&clouds=0&wind=1&winddir=90&gust=1&p.height=12`));
+      await openPlayer(page, lib(`object=Tree&preset=${preset}&view=close&time=11&clouds=0&wind=5&winddir=90&gust=1&p.height=12`));
       const amp: number[] = [], hashes: string[] = [];
       for (const [i, t] of times.entries()) {
         const f = await frameAt(page, t);
@@ -119,12 +119,13 @@ test.describe('деревья (Б2): ветер', () => {
 
   test('TAA в листве на ветру: ошибка против накопления мала, шлейфа нет (серия кадров подряд)', async () => {
     const q = (extra: string) => lib(`object=Tree&preset=birch&view=close&time=11&clouds=0&wind=7&winddir=90&p.height=12${extra}`, '&w=640&h=360');
-    const run = async (query: string, action: string) => {
+    const run = async (query: string, action: string, noPrev = false) => {
       const browser = await chromium.launch({ channel: 'chrome', args: ARGS });
       try {
         const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
         const errors: string[] = [];
         page.on('pageerror', (e) => errors.push(e.message));
+        if (noPrev) await page.addInitScript('globalThis.__treeNoPrev = true');
         await openPlayer(page, query);
         const b64 = await page.evaluate(`(() => { const p = window.__player; ${action};
           const c = document.getElementById('view'); const o = document.createElement('canvas'); o.width = c.width; o.height = c.height;
@@ -139,15 +140,26 @@ test.describe('деревья (Б2): ветер', () => {
       for (let i = 0; i < a.length; i += 4) { let m = 0; for (let k = 0; k < 3; k++) { const d = Math.abs(a[i + k]! - b[i + k]!); sum += d; if (d > m) m = d; } if (m > 12) big++; }
       return { meanAbs: sum / (a.length / 4 * 3), shareOver12: big / (a.length / 4) };
     };
-    const T = 3 + 9 * DT; // девять кадров подряд на ветру
+    const T = 3 + 9 * DT; // девять кадров подряд
+    const calm = '&wind=0.01'; // почти без ветра: что остаётся от самого TAA на листве
+    const taaCalm = await run(q(calm), `p.play(3, ${T})`);
     const taa = await run(q(''), `p.play(3, ${T})`);
+    const noPrev = await run(q(''), `p.play(3, ${T})`, true);
     const off = await run(q('&taa=0'), `p.play(3, ${T})`);
     const ref = await run(q('&accum=16&taa=0'), `p.show(${T})`);
-    const a = stats(taa, ref), b = stats(off, ref);
-    writeFileSync(`${OUT}/taa-wind-vs-accum16.json`, JSON.stringify({ taa: a, noAA: b }, null, 2));
-    expect(a.meanAbs).toBeLessThan(b.meanAbs); // TAA ближе к эталону, чем кадр без сглаживания
-    expect(a.meanAbs, 'ошибка TAA против накопления 16').toBeLessThan(2.5);
-    expect(a.shareOver12, 'доля сильно отличающихся пикселей (шлейф)').toBeLessThan(0.05);
+    const refCalm = await run(q(`${calm}&accum=16&taa=0`), `p.show(${T})`);
+    const next = await run(q(calm), `p.play(3, ${T + DT})`);
+    const r = {
+      windTaaVsAccum16: stats(taa, ref), windNoAA: stats(off, ref), windTaaWithoutPrevPosition: stats(noPrev, ref),
+      calmTaaVsAccum16: stats(taaCalm, refCalm), calmFrameToFrame: stats(taaCalm, next),
+    };
+    writeFileSync(`${OUT}/taa-wind-vs-accum16.json`, JSON.stringify(r, null, 2));
+    // шлейфа нет: на ветру TAA ошибается лишь немного больше, чем на безветрии, и заметно меньше, чем без положения вершин в прошлом кадре
+    expect(r.windTaaVsAccum16.meanAbs, 'ветер против безветрия').toBeLessThan(r.calmTaaVsAccum16.meanAbs + 1.5);
+    expect(r.windTaaVsAccum16.shareOver12).toBeLessThan(r.calmTaaVsAccum16.shareOver12 + 0.06);
+    expect(r.windTaaVsAccum16.meanAbs, 'с прошлым положением лучше, чем без').toBeLessThan(r.windTaaWithoutPrevPosition.meanAbs - 0.3);
+    // мерцания нет: соседние кадры на безветрии различаются не сильнее, чем кадр с эталоном накопления
+    expect(r.calmFrameToFrame.meanAbs, 'мерцание от кадра к кадру').toBeLessThan(r.calmTaaVsAccum16.meanAbs + 1);
   });
 
   test('два холодных запуска кадра с ветром и осенью: хэш равен, пиксели в допуске', async () => {

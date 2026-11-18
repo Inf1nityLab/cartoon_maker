@@ -44,14 +44,15 @@ export function createTreeLook(bark: BarkTex, leaf: LeafTex, init: { leaf: strin
   });
   const move = (leafy: boolean) => { const f = place(leafy); return Fn(() => {
     const cur = f(positionLocal, u.bend, u.t, u.flut, u.girth);
-    positionPrevious.assign(f(positionLocal, u.bendPrev, u.tPrev, u.flutPrev, u.girthPrev));
+    // __treeNoPrev — только для проверки в e2e: без прошлого положения (чтобы число показало, что оно нужно)
+    if ((globalThis as { __treeNoPrev?: boolean }).__treeNoPrev) positionPrevious.assign(f(positionLocal, u.bend, u.t, u.flut, u.girth)); else positionPrevious.assign(f(positionLocal, u.bendPrev, u.tPrev, u.flutPrev, u.girthPrev));
     return cur;
   })(); };
 
   // ---- кора
   const barkMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 });
   const barkTex = texture(bark.color, uv());
-  const snowUp = u.snow.mul(smoothstep(0.1, 0.65, normalWorld.y));
+  const snowUp = u.snow.mul(smoothstep(-0.35, 0.3, normalWorld.y));
   barkMat.colorNode = mix(barkTex.rgb.mul(u.barkTint).mul(3), SNOW, snowUp);
   barkMat.emissiveNode = barkTex.rgb.mul(0.12);
   barkMat.normalNode = normalMap(texture(bark.normal, uv()), vec2(0.8, 0.8));
