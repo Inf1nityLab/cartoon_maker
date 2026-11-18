@@ -34,7 +34,10 @@ type Params = Record<string, unknown>;
 const FORCES_DEFAULT: Params = { time: 11, windStrength: 2, windDirection: 90, gustiness: 0.3, cloudiness: 0.15, fog: 0 };
 const forcesParams: Params = { ...FORCES_DEFAULT };
 const readOverrides = (): Params => Object.fromEntries([...q.entries()].filter(([k]) => k.startsWith('p.')).map(([k, v]) => [k.slice(2), Number.isFinite(Number(v)) && v !== '' ? Number(v) : v === 'true' ? true : v === 'false' ? false : v]));
-let presetName = q.get('preset') && ALL_PRESETS[q.get('preset')!] ? q.get('preset')! : Object.keys(ALL_PRESETS)[0] ?? '';
+let presetName = q.get('preset') && ALL_PRESETS[q.get('preset')!] ? q.get('preset')! : show.defaultPreset ?? Object.keys(ALL_PRESETS)[0] ?? '';
+const setupOf = () => show.setups?.[presetName] ?? show.setups?.default;
+let diveAt: number | null = q.has('dive') ? num(q.get('dive'), 1) : null;
+const DIVE = { down: 4, hold: 3, up: 4 };
 const defaults = (): Params => (def.params as unknown as { parse(x: unknown): Params }).parse(presetName ? ALL_PRESETS[presetName] : objectName === 'Road' ? { path: 'road' } : {});
 const defaultsOf = (def.params as unknown as { parse(x: unknown): Params }).parse(objectName === 'Road' ? { path: 'road' } : {});
 let params: Params = { ...defaults(), ...readOverrides() };
@@ -59,7 +62,9 @@ const FPS = num(q.get('fps'), 30);
 const VIEWS: Record<string, string> = { general: 'общий', close: 'крупно', ground: 'у земли', top: 'сверху' };
 
 /** Камера витрины: именованные виды считаются от размера объекта (showcase.size) и высоты взгляда (showcase.eye). */
-function viewShot(name: string): { at: Vec3; look: Vec3; fov: number } {
+function viewShot(name: string): { at: Vec3; look: Vec3; fov: number; abs?: boolean } {
+  const sv = setupOf()?.views?.[name];
+  if (sv) return { at: sv.at, look: sv.look, fov: sv.fov ?? 45, abs: sv.abs === true };
   // объект меняет размер вместе с параметром height (если он есть): камера держит его в кадре
   const k = typeof params.height === 'number' && typeof defaultsOf.height === 'number' ? Math.max(0.3, params.height / defaultsOf.height) : 1;
   const far = show.kind === 'world' ? 0.4 : 1; // объекты мира снимаются ближе, относительно их размера
@@ -76,20 +81,29 @@ function viewShot(name: string): { at: Vec3; look: Vec3; fov: number } {
 function build(): SceneDoc {
   const hills = show.ground === 'hills' || TERRAIN_LIKE.includes(objectName);
   const doc = buildScene((s) => {
+    const setup = setupOf();
     if (objectName === 'Terrain') s.world.use('Terrain', params);
-    else s.world.use('Terrain', hills ? { style: 'hills', seed: 7 } : { style: 'flat' });
-    if (hills) s.world.use('Water', {});
+    else s.world.use('Terrain', hills ? (setup?.terrain ?? { style: 'hills', seed: 7 }) : { style: 'flat' });
+    if (setup?.path) s.path('water', { points: setup.path });
+    if (hills && objectName !== 'Water') s.world.use('Water', {});
     if (objectName === 'Sky') s.world.use('Sky', params);
     else { s.world.use('Sky', {}); s.world.use('Forces', objectName === 'Forces' ? params : forcesParams); }
     if (objectName === 'Road') { s.path('road', { points: [[-45, 0, -22], [-14, 0, -6], [10, 0, 3], [45, 0, 30]] }); s.world.use('Road', params); }
     else if (show.kind === 'world' && !['Terrain', 'Sky', 'Forces'].includes(objectName)) s.world.use(objectName, params);
     if (show.kind === 'entity') { s.places({ center: [0, 0, 0] }); s.add(objectName, params, { at: 'center', heading: 175, id: objId }); }
     const v = viewShot(viewName);
-    s.at(0).camera.shot('fixed', { at: v.at, look: v.look, fov: v.fov, aboveGround: true });
+    s.at(0).camera.shot('fixed', { at: v.at, look: v.look, fov: v.fov, aboveGround: !v.abs });
+    const dv = setupOf()?.views?.dive;
+    if (diveAt !== null && dv && v.abs) {
+      // нырнуть: плавно под воду, подержать, вернуться
+      const dsh = { fov: dv.fov ?? 55, aboveGround: false } as const;
+      s.at(diveAt).camera.shot('glide', { from: v.at, to: dv.at, lookFrom: v.look, lookTo: dv.look, duration: DIVE.down, ...dsh });
+      s.at(diveAt + DIVE.down + DIVE.hold).camera.shot('glide', { from: dv.at, to: v.at, lookFrom: dv.look, lookTo: v.look, duration: DIVE.up, ...dsh });
+    }
   }, { id: `library-${objectName}`, title: `Витрина: ${objectName}`, duration: DURATION, seed: 11, aspect: '16:9' });
   const events: TimelineEvent[] = [];
   const demo = demoIndex !== null ? show.demos?.[demoIndex] : undefined;
-  demo?.steps.forEach((st, i) => events.push({ id: `demo${i}`, t: st.t, target: objId, action: st.action, args: st.args }));
+  demo?.steps.forEach((st, i) => events.push({ id: `demo${i}`, t: st.t, target: st.target ?? objId, action: st.action, args: st.args }));
   userEvents.forEach((e, i) => events.push({ id: `user${i}`, t: e.t, target: 'forces', action: e.action, args: e.args }));
   doc.timeline = [...doc.timeline, ...events].map((e, i) => ({ e, i })).sort((a, b) => a.e.t - b.e.t || a.i - b.i).map((x) => x.e);
   return doc;
@@ -184,6 +198,8 @@ function control(f: Field, store: Params, onChange: () => void, out?: string): H
 const fmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
 
 function panels() {
+  const db = document.getElementById('dive') as HTMLButtonElement | null;
+  if (db) db.style.display = show.dive && setupOf()?.views?.dive ? '' : 'none';
   $('title').textContent = `Витрина: ${objectName}`;
   const sel = $<HTMLSelectElement>('object');
   sel.innerHTML = '';
@@ -251,6 +267,11 @@ $<HTMLButtonElement>('play').onclick = () => { playing = !playing; $('play').tex
 $<HTMLButtonElement>('restart').onclick = () => { t = 0; draw(true); };
 slider.oninput = () => { t = Number(slider.value); draw(true); };
 $<HTMLInputElement>('free').onchange = (e) => { free = (e.target as HTMLInputElement).checked; adapter.setFreeCamera(free); };
+const diveBtn = document.getElementById('dive') as HTMLButtonElement | null;
+if (diveBtn) {
+  diveBtn.style.display = show.dive && setupOf()?.views?.dive ? '' : 'none';
+  diveBtn.onclick = () => { diveAt = Math.round(t * 60) / 60; playing = true; $('play').textContent = '⏸'; setView(); };
+}
 $<HTMLButtonElement>('gust').onclick = () => {
   if (objectName === 'Sky') return;
   userEvents.push({ t: Math.round(t * 60) / 60, action: 'gust', args: { strength: 9, duration: 3 } });

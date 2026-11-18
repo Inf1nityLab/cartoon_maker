@@ -10,7 +10,8 @@ import { sunVector } from './light/math.ts';
 import type { DofSettings, LookSettings, PostFrame } from './frame/post.ts';
 import { MultipedView } from './views/multiped.ts';
 import { RobotView } from './views/robot.ts';
-import { SkyView, TerrainView, WaterView } from './views/world.ts';
+import { SkyView, TerrainView } from './views/world.ts';
+import { WaterView } from './views/water.ts';
 import { createSunShadow, type CascadeInfo } from './light/sunShadow.ts';
 import { createProbe, type ProbeOptions } from './light/probe.ts';
 
@@ -112,6 +113,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
     },
     sync(state, snap) {
       for (const m of mounted) m.view.sync(m.handle, snap.components[m.id]!.self, three, state);
+      for (const m of mounted) m.view.late?.(m.handle, snap.components[m.id]!.self, three, state);
       lastTarget = state.camera.target;
       if (frame.fx) {
         const look = lookId ? (snap.components[lookId]?.self as LookSettings | undefined) ?? null : null;

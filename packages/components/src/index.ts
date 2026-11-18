@@ -6,9 +6,9 @@ import { Multiped } from './multiped.ts';
 import { FilmLook } from './filmlook.ts';
 import { Robot } from './robot/index.ts';
 import { Road } from './road.ts';
-import { Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed } from './shots.ts';
+import { Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed, Glide } from './shots.ts';
 
-export const registry = createRegistry([Terrain, Water, Sky, Forces, Road, Multiped, FilmLook, Robot], [Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed]);
+export const registry = createRegistry([Terrain, Water, Sky, Forces, Road, Multiped, FilmLook, Robot], [Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed, Glide]);
 export { Terrain, Sky, terrainHeight, TerrainParams } from './world.ts';
 export { Water, WaterParams, seaOf, iceNow, type WaterSelf, type Ring } from './water.ts';
 export { waveModes, waveHeightAt, seaState, windAzimuth, LAYER_COUNT, GRAVITY, type WaveMode, type SeaState, type SeaLayer, type SeaInput, type WaveLayerName } from './water-waves.ts';

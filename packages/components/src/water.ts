@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { defineComponent, type Ctx, type PathSampler, type WaterField } from '@cartoon/engine';
+import { defineComponent, type Ctx, type PathSampler, type ShowSetup, type WaterField } from '@cartoon/engine';
 import { Target, type Vec3 } from '@cartoon/schema';
 import { seaState, smooth01, waveHeightAt, windAzimuth, type SeaState } from './water-waves.ts';
 
@@ -114,6 +114,8 @@ type RiverModel = {
   grade(x: number, z: number, base: (x: number, z: number) => number): number;
   /** Уровень воды в ближайшей к (x, z) точке оси (нужен grade хотя бы раз вызванный; иначе null). */
   surfaceAt(x: number, z: number): number | null;
+  /** То же, но и за берегом (по ближайшей точке оси). */
+  surfaceExt(x: number, z: number): number;
   flow(x: number, z: number): [number, number];
   nearest(x: number, z: number): { d: number; i: number; t: number };
 };
@@ -179,8 +181,12 @@ function buildRiver(path: PathSampler, p: WaterParams): RiverModel {
       const r = nearest(x, zz, 0);
       return r.d <= hw ? surfAt(r.i, r.t) : null;
     },
+    surfaceExt(x, zz) {
+      const r = nearest(x, zz, 1e9);
+      return surface ? surfAt(r.i, r.t) : 0;
+    },
     flow(x, zz) {
-      const r = nearest(x, zz, 0);
+      const r = nearest(x, zz, 1e9);
       if (!isFinite(r.d)) return [0, 0];
       const ex = xs[r.i + 1]! - xs[r.i]!, ez = zs[r.i + 1]! - zs[r.i]!, l = Math.hypot(ex, ez) || 1;
       return [ex / l, ez / l];
@@ -213,6 +219,25 @@ export const seaOf = (s: WaterSelf, swellLength: number): SeaState => seaState({
 export const iceNow = (ice: number, temp: number, p: Pick<WaterParams, 'temperatureSensitivity' | 'freezeAt'>): number =>
   Math.max(ice, p.temperatureSensitivity * smooth01((p.freezeAt - temp) / 6));
 
+const OCEAN_SETUP: ShowSetup = {
+  terrain: { style: 'hills', seed: 7, amplitude: 3, scale: 0.02, size: 400, segments: 384, ground: 'soil', lake: { at: [-190, 0], radius: 170, depth: 22 } },
+  views: {
+    general: { at: [-30, 3.2, 14], look: [-150, 0.2, -10], fov: 50, abs: true },
+    close: { at: [-56, 1.4, 6], look: [-100, 0, 0], fov: 45, abs: true },
+    ground: { at: [-50, 0.3, 9], look: [-110, 0, 0], fov: 60, abs: true },
+    top: { at: [-75, 70, 0], look: [-95, 0, 0], fov: 50, abs: true },
+    dive: { at: [-95, -1.5, 6], look: [-160, -3, 0], fov: 60, abs: true },
+  },
+};
+const RIVER_PATH: [number, number, number][] = [[-70, 0, -35], [-35, 0, 5], [0, 0, -10], [30, 0, 18], [70, 0, 10]];
+const RIVER_VIEWS: NonNullable<ShowSetup['views']> = {
+  general: { at: [-52, 9, -52], look: [0, 0, 0], fov: 50 },
+  close: { at: [-24, 2.2, 16], look: [-16, -0.5, -6], fov: 45 },
+  ground: { at: [-6, 0.6, 2], look: [14, -0.3, -2], fov: 55 },
+  top: { at: [0, 80, 0], look: [0, 0, 0], fov: 55, abs: true },
+  dive: { at: [-12, -0.3, 0], look: [10, -0.5, -8], fov: 60, abs: true },
+};
+
 export const Water = defineComponent<WaterParams, WaterSelf>({
   type: 'Water',
   version: 2,
@@ -236,14 +261,33 @@ export const Water = defineComponent<WaterParams, WaterSelf>({
     flowSpeed: { unit: 'м/с' }, flowDirection: { unit: '°' }, clarity: {}, foam: {}, reflection: {}, ice: {}, shallowColor: {}, deepColor: {},
   },
   showcase: {
-    kind: 'world', size: 50, eye: 1.2, ground: 'hills',
+    kind: 'world', size: 50, eye: 1.2, ground: 'hills', defaultPreset: 'pond-forest', dive: true,
+    setups: {
+      default: {
+        terrain: { style: 'hills', seed: 7, amplitude: 3.5, scale: 0.05, size: 240, segments: 384, ground: 'soil', lake: { at: [0, 0], radius: 34, depth: 9 } },
+        views: {
+          general: { at: [-24, 5, -30], look: [0, -1, 3], fov: 45, abs: true },
+          close: { at: [-13, 1.3, -15], look: [0, -0.6, 2], fov: 40, abs: true },
+          ground: { at: [-9, 0.15, -12], look: [0, -0.5, 3], fov: 55, abs: true },
+          top: { at: [0, 48, -2], look: [0, 0, 0], fov: 45, abs: true },
+          dive: { at: [3, -1.6, -9], look: [0, -2.2, 8], fov: 55, abs: true },
+        },
+      },
+      'ocean-tropical': OCEAN_SETUP,
+      'ocean-storm': OCEAN_SETUP,
+      creek: { terrain: { style: 'hills', seed: 7, amplitude: 5, scale: 0.03, size: 240, segments: 384, ground: 'soil' }, path: RIVER_PATH, views: RIVER_VIEWS },
+      river: { terrain: { style: 'hills', seed: 7, amplitude: 5, scale: 0.03, size: 240, segments: 384, ground: 'soil' }, path: RIVER_PATH, views: RIVER_VIEWS },
+    },
     demos: [
       {
-        title: 'Штиль, ветер, шторм (океан)', duration: 14,
+        title: 'Штиль, ветер, шторм (океан)', duration: 15,
         steps: [
           { t: 0, action: 'calm', args: { over: 0.1 } },
+          { t: 0, target: 'forces', action: 'handle.set', args: { handle: 'windStrength', value: 0 } },
+          { t: 2.5, target: 'forces', action: 'handle.to', args: { handle: 'windStrength', value: 9, over: 5 } },
           { t: 3, action: 'storm', args: { over: 6, severity: 1 } },
-          { t: 10, action: 'calm', args: { over: 3 } },
+          { t: 10.5, target: 'forces', action: 'handle.to', args: { handle: 'windStrength', value: 1, over: 3 } },
+          { t: 10.5, action: 'calm', args: { over: 3 } },
         ],
       },
       {
@@ -333,6 +377,7 @@ export const Water = defineComponent<WaterParams, WaterSelf>({
       open: p.open,
       level: levelAt,
       depth: depthAt,
+      surface: (x, z) => { if (p.shape !== 'river') return p.level; ensure(); return river!.surfaceExt(x, z); },
       flowDir(x, z) {
         if (p.shape === 'river') return river!.flow(x, z);
         const a = (p.flowDirection * Math.PI) / 180;

@@ -68,6 +68,8 @@ export type WaterField = {
   level(x: number, z: number): number | null;
   /** Глубина воды в точке, м (0 на суше). Всегда level − heightAt или 0. */
   depth(x: number, z: number): number;
+  /** Уровень поверхности, продолженный за берег (для меша и карты глубины): у basin — level, у реки — уровень ближайшей точки оси. */
+  surface(x: number, z: number): number;
   /** Единичное направление течения в точке ([0,0] — течения нет). */
   flowDir(x: number, z: number): [number, number];
 };
@@ -166,8 +168,18 @@ export type ComponentDef<P = any, S extends object = any> = {
 };
 
 /** Шаг демо-показа: событие для самого объекта. action — 'handle.set', 'handle.to' или действие компонента. */
-export type DemoStep = { t: number; action: string; args: Record<string, unknown> };
+export type DemoStep = { t: number; action: string; args: Record<string, unknown>; /** id другого компонента мира (например 'forces'); по умолчанию — сам объект */ target?: string };
 export type Demo = { title: string; duration: number; steps: DemoStep[] };
+
+/** Сцена вокруг объекта мира в витрине: свой рельеф, путь и камеры (под пресет). Только данные. */
+export type ShowSetup = {
+  /** Параметры Terrain для сцены витрины (по умолчанию холмы seed 7) */
+  terrain?: Record<string, unknown>;
+  /** Путь scene.paths.water для рек и ручьёв */
+  path?: [number, number, number][];
+  /** Именованные виды: at и look — [x, высота, z]; abs — высоты абсолютные, иначе над землёй; dive — вид «под водой» для кнопки «нырнуть» */
+  views?: Record<string, { at: [number, number, number]; look: [number, number, number]; fov?: number; abs?: boolean }>;
+};
 
 /** Подсказки витрине: какого размера объект, где он (в мире или сам по себе) и что умеет показать. */
 export type Showcase = {
@@ -181,6 +193,12 @@ export type Showcase = {
   ground?: 'flat' | 'hills';
   /** Короткие показы ручек во времени, 8–15 с. Первый — основной. */
   demos?: Demo[];
+  /** Пресет, с которого открывается витрина (по умолчанию первый) */
+  defaultPreset?: string;
+  /** Сцена под пресет: ключ — имя пресета, 'default' — для остальных */
+  setups?: Record<string, ShowSetup>;
+  /** Показывать кнопку «нырнуть»: камера плавно уходит из вида general в вид dive и обратно */
+  dive?: boolean;
 };
 
 export function defineComponent<P, S extends object>(def: ComponentDef<P, S>): ComponentDef<P, S> {

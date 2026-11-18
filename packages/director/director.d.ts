@@ -685,6 +685,24 @@ export type FixedShotArgs = {
   fov?: number;
 };
 
+/** кадр «glide»: Камера плавно едет из точки в точку и так же смотрит из точки в точку за duration секунд (кривая ease-in-out), потом стоит. Высоты — абсолютные (можно под воду) или над землёй (aboveGround). */
+export type GlideShotArgs = {
+  /** откуда [x, высота, z], м */
+  from: [number, number, number];
+  /** куда [x, высота, z], м */
+  to: [number, number, number];
+  /** куда смотрит в начале [x, высота, z], м */
+  lookFrom: [number, number, number];
+  /** куда смотрит в конце [x, высота, z], м */
+  lookTo: [number, number, number];
+  /** за сколько секунд, с; от 0.1; до 120; по умолчанию 4 */
+  duration?: number;
+  /** высоты отсчитываются от земли под точкой; по умолчанию false */
+  aboveGround?: boolean;
+  /** от 10; до 110; по умолчанию 50 */
+  fov?: number;
+};
+
 export interface Director {
   places(p: Record<string, [number, number, number]>): void;
   path(id: string, p: { points: [number, number, number][]; closed?: boolean }): void;

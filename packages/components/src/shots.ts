@@ -113,6 +113,27 @@ export const Crane = defineShot({
   examples: ["s.at(50).camera.shot('crane', { target: spider, to: 30, duration: 8 })"],
 });
 
+export const Glide = defineShot({
+  type: 'glide',
+  describe: 'Камера плавно едет из точки в точку и так же смотрит из точки в точку за duration секунд (кривая ease-in-out), потом стоит. Высоты — абсолютные (можно под воду) или над землёй (aboveGround).',
+  params: z.object({
+    from: Vec3Z.describe('откуда [x, высота, z], м'),
+    to: Vec3Z.describe('куда [x, высота, z], м'),
+    lookFrom: Vec3Z.describe('куда смотрит в начале [x, высота, z], м'),
+    lookTo: Vec3Z.describe('куда смотрит в конце [x, высота, z], м'),
+    duration: z.number().min(0.1).max(120).default(4).describe('за сколько секунд, с'),
+    aboveGround: z.boolean().default(false).describe('высоты отсчитываются от земли под точкой'),
+    fov: z.number().min(10).max(110).default(50),
+  }),
+  solve(a, ctx, t) {
+    const k = ease(Math.min(1, Math.max(0, t / a.duration)));
+    const mix = (p: Vec3, q: Vec3): Vec3 => [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k, p[2] + (q[2] - p[2]) * k];
+    const at = (p: Vec3): Vec3 => [p[0], a.aboveGround ? ctx.heightAt(p[0], p[2]) + p[1] : p[1], p[2]];
+    return { pos: at(mix(a.from, a.to)), target: at(mix(a.lookFrom, a.lookTo)), fov: a.fov };
+  },
+  examples: ["s.at(2).camera.shot('glide', { from: [0, 3, -10], to: [0, -1.5, -6], lookFrom: [0, 0, 0], lookTo: [0, -2, 4], duration: 4 })"],
+});
+
 export const Fixed = defineShot({
   type: 'fixed',
   describe: 'Камера в заданной точке и смотрит в заданную точку, опционально едет по прямой. Высоты — над землёй (aboveGround) или абсолютные.',

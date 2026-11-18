@@ -54,21 +54,6 @@ export const TerrainView = defineView('Terrain', {
   dispose(mesh, three) { three.scene.remove(mesh); mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose(); },
 });
 
-export const WaterView = defineView('Water', {
-  mount(three, inst) {
-    const size = 600;
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2),
-      new THREE.MeshStandardMaterial({ color: (inst.params.color as string | undefined) ?? '#2a6f97', transparent: true, opacity: 0.82, roughness: 0.15, metalness: 0.1 }),
-    );
-    mesh.position.y = three.sim().services.waterLevel;
-    three.scene.add(mesh);
-    return mesh;
-  },
-  sync() {},
-  dispose(mesh, three) { three.scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); },
-});
-
 type ForcesView = {
   sunLight: { strength: number }; moonLight: { elevation: number; azimuth: number; strength: number };
   cloudiness: number; fog: number;

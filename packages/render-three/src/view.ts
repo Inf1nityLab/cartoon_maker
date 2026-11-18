@@ -16,6 +16,8 @@ export type ThreeCtx = {
 export type ViewDef<H = any> = {
   mount(three: ThreeCtx, inst: ComponentInstance): H;
   sync(handle: H, self: any, three: ThreeCtx, state: WorldState): void;
+  /** Необязательно: после sync всех видов кадра (вода переопределяет туман и фон под водой поверх неба). */
+  late?(handle: H, self: any, three: ThreeCtx, state: WorldState): void;
   dispose(handle: H, three: ThreeCtx): void;
 };
 export const defineView = <H>(type: string, def: ViewDef<H>): [string, ViewDef<H>] => [type, def];
