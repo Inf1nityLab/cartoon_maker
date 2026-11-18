@@ -104,14 +104,15 @@ test.describe('витрина объектов: интерфейс (Б0)', () =>
     expect(await page.locator('#f-time-out').textContent()).toBe('08:00');
     // порыв ветра и демо
     await page.locator('#gust').click();
-    await page.waitForTimeout(600);
+    // кадры идут по часам страницы и на нагруженной машине редки: ждём, пока время фильма уйдёт за момент порыва
+    await page.waitForFunction(() => (window as unknown as { __player: { state(): any } }).__player.state().world.forces.wind.gust > 0, undefined, { timeout: 20_000 });
     expect((await state()).world.forces.wind.gust).toBeGreaterThan(0);
     await page.getByRole('button', { name: /▶ Огни меняют цвет/ }).click();
     await page.waitForTimeout(800);
     // виды камеры
     for (const v of ['крупно', 'у земли', 'сверху', 'общий']) { await page.getByRole('button', { name: v, exact: true }).click(); await page.waitForTimeout(300); }
     // снимок: скачивается PNG
-    const dl = page.waitForEvent('download');
+    const dl = page.waitForEvent('download', { timeout: 90_000 });
     await page.locator('#snap').click();
     const file = await dl;
     expect(file.suggestedFilename()).toMatch(/\.png$/);
