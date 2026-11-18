@@ -3,6 +3,7 @@ import * as TSL from 'three/tsl';
 import { seaOf, waveHeightAt, waveModes, WaterParams, type WaterSelf, type WaveLayerName } from '@cartoon/components';
 import type { WaterField } from '@cartoon/engine';
 import { defineView } from '../view.ts';
+import type { Sky } from '../sky/nodes.ts';
 import { buildGridGeometry, buildRadialGeometry, buildWaterMap, mapDepthAt, type WaterMap } from './water-map.ts';
 
 type N = any;
@@ -33,16 +34,16 @@ type U = ReturnType<typeof makeUniforms>;
 const colorU = () => uniform(new THREE.Color());
 const vec3U = (x = 0, y = 0, z = 0) => uniform(new THREE.Vector3(x, y, z));
 
-function makeUniforms(seed: number) {
+function makeUniforms(seed: number, sky: Sky) {
   const layer = (): Layer => ({ gain: uniform(0), sinP: uniform(0), cosP: uniform(1), inv: uniform(1), sq: uniform(1) });
   return {
-    seed,
+    seed, sky,
     time: uniform(0), drift: uniform(0),
     layers: { swell: layer(), wind: layer(), ripple: layer() } as Record<WaveLayerName, Layer>,
     rings: Array.from({ length: MAX_RINGS }, () => uniform(new THREE.Vector4(0, 0, 0, 0))),
     shallow: colorU(), deep: colorU(), bed: colorU(),
     bedBlend: uniform(0), vis: uniform(5), kScale: uniform(1), reflection: uniform(0.8), foam: uniform(0.5), ice: uniform(0), foamWave: uniform(0), flowOn: uniform(0),
-    sunDir: vec3U(0, 1, 0), sunRad: vec3U(), light: vec3U(), skyHorizon: colorU(), skyZenith: colorU(),
+    sunDir: vec3U(0, 1, 0), sunRad: vec3U(), light: vec3U(),
     uwColor: colorU(), uwLight: uniform(1),
     mapOrigin: uniform(new THREE.Vector2()), mapSize: uniform(new THREE.Vector2(1, 1)),
     center: uniform(new THREE.Vector2()), ripple01: uniform(0),
@@ -96,13 +97,8 @@ function rings(u: U, p: N) {
 
 const mapUv = (u: U, p: N) => p.sub(u.mapOrigin).div(u.mapSize);
 
-/** Цвет неба в направлении r (по цвету фона, который задал Sky) и светлое гало вокруг солнца. */
-const skyColor = (u: U, r: N) => {
-  const t = pow(clamp(r.y, 0, 1), 0.5);
-  const base = mix(u.skyHorizon, u.skyZenith, t);
-  const glow = pow(max(dot(r, u.sunDir), 0), 12).mul(0.22);
-  return base.add(u.sunRad.mul(glow).mul(0.12));
-};
+/** Цвет неба в направлении r: единый источник (sky/nodes.ts): тот же узел, что рисует купол неба (градиент, закат, облака, луна, звёзды). */
+const skyColor = (u: U, r: N) => u.sky.radiance(r, true);
 
 /**
  * ТОЧКА РАСШИРЕНИЯ (задача Б1в): отражение предметов. Сейчас вода отражает только небо. Б1в добавит сюда отражение в экранном
@@ -322,7 +318,7 @@ export const WaterView = defineView<Handle>('Water', {
       return h;
     }
     h.water = water; h.cfg = cfg; h.heightAt = sv.heightAt;
-    const u = makeUniforms(cfg.seed);
+    const u = makeUniforms(cfg.seed, three.sky);
     const map = buildWaterMap(water, sv.heightAt, cfg.level, cfg.deepDepth);
     h.u = u; h.map = map;
     u.mapOrigin.value.set(map.x0, map.z0); u.mapSize.value.set(map.w, map.h);
@@ -387,12 +383,9 @@ export const WaterView = defineView<Handle>('Water', {
     (u.sunDir.value as THREE.Vector3).copy(dir);
     const sunRad = u.sunRad.value as THREE.Vector3;
     sunRad.set(sun.color.r, sun.color.g, sun.color.b).multiplyScalar(sun.intensity);
-    const sky = h.tmpA.copy(hemi.color).multiplyScalar(hemi.intensity);
+    // свет неба: из общего расчёта неба (ambient — средняя яркость неба над землёй), без неба в сцене — из полусферического света
+    const sky = three.skyState.active ? h.tmpA.copy(three.skyState.ambient).multiplyScalar(PI) : h.tmpA.copy(hemi.color).multiplyScalar(hemi.intensity);
     (u.light.value as THREE.Vector3).set(sunRad.x * Math.max(dir.y, 0) + sky.r, sunRad.y * Math.max(dir.y, 0) + sky.g, sunRad.z * Math.max(dir.y, 0) + sky.b).multiplyScalar(1 / PI);
-    const bg = three.scene.background instanceof THREE.Color ? three.scene.background : h.tmpB.set('#8ec1ee');
-    (u.skyHorizon.value as THREE.Color).copy(bg);
-    (u.skyHorizon.value as THREE.Color).multiplyScalar(0.75);
-    (u.skyZenith.value as THREE.Color).copy(bg).multiplyScalar(0.55);
     const sunUp = Math.max(0, Math.min(1, dir.y * 4)) * (sun.intensity > 0.01 ? 1 : 0);
     u.bedLight.value = sunUp * Math.max(0, 1 - self.iceEff * 0.9);
     u.caustic.value = 1.6;

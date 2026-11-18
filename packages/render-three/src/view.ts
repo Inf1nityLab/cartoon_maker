@@ -2,6 +2,7 @@ import type * as THREE from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { SimSnapshot } from '@cartoon/engine';
 import type { ComponentInstance, WorldState } from '@cartoon/schema';
+import type { Sky } from './sky/nodes.ts';
 
 /** Всё, что видам нужно от Three.js. Живёт только внутри render-three. */
 export type ThreeCtx = {
@@ -9,6 +10,12 @@ export type ThreeCtx = {
   renderer: WebGPURenderer;
   sunLight: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
+  /** Окружение неба для света на земле (сферические гармоники); значения пишет вид Sky. */
+  skyProbe: THREE.LightProbe;
+  /** Единый источник цвета неба: узел `radiance(направление)` и униформы солнца, луны, облаков. Им пользуются все виды, что отражают небо (вода). */
+  sky: Sky;
+  /** Состояние неба кадра для видов (заполняет Sky первым в кадре): средняя яркость неба (линейная) и признак, что небо управляет светом. */
+  skyState: { ambient: THREE.Color; active: boolean; shadowSoft: number; daylight: number };
   sim: () => SimSnapshot;
 };
 

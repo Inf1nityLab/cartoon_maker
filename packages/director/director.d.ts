@@ -243,9 +243,9 @@ export interface Sky extends HandleBase {
  *   sky.to('elevation', 20, { over: 8 })
  */
 
-/** Силы мира: время суток (солнце, луна, звёзды), ветер (направление, сила, порывы), облачность, туман, температура. Объекты слушают их через ctx.wind(p), ctx.light(p), ctx.temperature(p), ctx.timeOfDay с собственной чувствительностью. Ручки: time, windStrength, windDirection, gustiness, cloudiness, fog, temperature, moonPhase. Поведения: gust, calm, sunset, sunrise. */
+/** Силы мира: время суток (солнце, луна, звёзды), ветер (направление, сила, порывы), облачность, туман, температура. Объекты слушают их через ctx.wind(p), ctx.light(p), ctx.temperature(p), ctx.timeOfDay с собственной чувствительностью. Ручка time идёт по кругу: to(time, 26) приходит к 02:00 вперёд через полночь. Небо (облака, луна с фазой, звёзды, дымка) и свет на земле считает вид Sky по этим силам; облака плывут по ветру. Пресеты: dawn, noon, golden-hour, sunset, moonlit-night, overcast, foggy-morning. Ручки: time, windStrength, windDirection, gustiness, cloudiness, fog, temperature, moonPhase. Поведения: gust, calm, sunset, sunrise. */
 export interface ForcesParams {
-  /** время суток, часы (0–24; 5 — восход, 12 — полдень, 19 — закат, 0 — полночь); от 0; до 24; по умолчанию 12 */
+  /** время суток, часы (0–24; 5 — восход, 12 — полдень, 19 — закат, 0 — полночь). Ручкой можно дойти до 96: больше 24 — следующие сутки (26 = 02:00); от 0; до 24; по умолчанию 12 */
   time?: number;
   /** наибольшая высота солнца в полдень, ° (меньше — севернее или зимой); от 10; до 90; по умолчанию 62 */
   sunArc?: number;
@@ -266,6 +266,8 @@ export interface ForcesParams {
   /** освещённость луны: 0 новолуние, 1 полнолуние; от 0; до 1; по умолчанию 1 */
   moonPhase?: number;
 }
+/** Пресеты Forces: dawn, noon, golden-hour, sunset, moonlit-night, overcast, foggy-morning */
+export type ForcesPreset = "dawn" | "noon" | "golden-hour" | "sunset" | "moonlit-night" | "overcast" | "foggy-morning";
 export interface Forces extends HandleBase {
   /** действие gust */
   gust(args?: {
@@ -289,7 +291,7 @@ export interface Forces extends HandleBase {
     /** за сколько секунд, с; от 0; до 3600; по умолчанию 40 */
     over?: number;
   }): Command;
-  /** Ручка «time»: время суток, часы (0–24; 5 — восход, 12 — полдень, 19 — закат, 0 — полночь). Единицы: ч. Диапазон 0…24. */
+  /** Ручка «time»: время суток, часы; больше 24 — следующие сутки (26 = 02:00), мир показывает остаток от деления на 24. Единицы: ч. Диапазон 0…96. */
   set(handle: "time", value: number): Command;
   to(handle: "time", value: number, opts?: { over?: number; ease?: Ease }): Command;
   /** Ручка «windDirection»: куда дует ветер, ° (0 — на север, +z; 90 — на восток, +x). Единицы: °. Диапазон 0…360. */

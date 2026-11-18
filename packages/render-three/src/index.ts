@@ -14,6 +14,7 @@ import { TreeView } from './views/tree.ts';
 import { SkyView, TerrainView } from './views/world.ts';
 import { WaterView } from './views/water.ts';
 import { createSunShadow, type CascadeInfo } from './light/sunShadow.ts';
+import { createSky } from './sky/nodes.ts';
 import { createProbe, type ProbeOptions } from './light/probe.ts';
 
 export * from './view.ts';
@@ -73,7 +74,15 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
   let lookId: string | null = null; // компонент FilmLook сцены (вид плёнки)
   let post: PostFrame | null = null;
   let shaderBuilds = 0;
-  const mounted: { handle: unknown; view: ViewDef; id: string }[] = [];
+  const mounted: { handle: unknown; view: ViewDef; id: string; first?: boolean }[] = [];
+  // Небо идёт первым в кадре: свет и цвет неба нужны воде и остальным видам уже в этом кадре, а не из прошлого
+  const mountAll = (doc: SceneDoc) => {
+    for (const inst of [...doc.world, ...Object.values(doc.entities)]) {
+      const view = views[inst.type];
+      if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst), first: inst.type === 'Sky' });
+    }
+    mounted.sort((a, b) => Number(!!b.first) - Number(!!a.first));
+  };
 
   return {
     async mount(c, doc, sim) {
@@ -93,25 +102,22 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       const sunLight = new THREE.DirectionalLight('#ffffff', 2);
       const hemi = new THREE.HemisphereLight('#bcd8ff', '#3b4a2a', 0.6);
       scene.add(sunLight, sunLight.target, hemi);
-      three = { scene, renderer, sunLight, hemi, sim };
+      const skyProbe = new THREE.LightProbe(); // свет неба на землю: создан сразу, дальше меняются только коэффициенты
+      skyProbe.intensity = 0;
+      scene.add(skyProbe);
+      three = { scene, renderer, sunLight, hemi, skyProbe, sky: createSky(), skyState: { ambient: new THREE.Color(0.3, 0.4, 0.55), active: false, shadowSoft: 0, daylight: 1 }, sim };
       camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 800);
       sunShadow = createSunShadow(sunLight, renderer, camera);
       probe = createProbe(scene);
       probe.set(probeOpts);
       const types = new Set([...doc.world, ...Object.values(doc.entities)].map((i) => i.type));
       await Promise.all([...types].map((t) => views[t]?.preload?.()));
-      for (const inst of [...doc.world, ...Object.values(doc.entities)]) {
-        const view = views[inst.type];
-        if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst) });
-      }
+      mountAll(doc);
     },
     remount(doc) {
       for (const m of mounted) m.view.dispose(m.handle, three);
       mounted.length = 0;
-      for (const inst of [...doc.world, ...Object.values(doc.entities)]) {
-        const view = views[inst.type];
-        if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst) });
-      }
+      mountAll(doc);
       lookId = [...doc.world, ...Object.values(doc.entities)].find((c) => c.type === 'FilmLook')?.id ?? null;
     },
     sync(state, snap) {
@@ -136,7 +142,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       controls?.update();
-      sunShadow.update(); // каскады и смещения под текущие fov/aspect: до рендера, чтобы кадр не зависел от прошлого
+      sunShadow.update(three.skyState.shadowSoft); // каскады и смещения под текущие fov/aspect: до рендера, чтобы кадр не зависел от прошлого
       const px = frame.pixels({ w, h });
       pipeline.render(three.scene, camera, px, post);
     },
