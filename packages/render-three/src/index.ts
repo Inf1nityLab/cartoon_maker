@@ -75,6 +75,7 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
   let post: PostFrame | null = null;
   let shaderBuilds = 0;
   const mounted: { handle: unknown; view: ViewDef; id: string }[] = [];
+  let remountSeq = 0;
 
   return {
     async mount(c, doc, sim) {
@@ -110,7 +111,9 @@ export function createThreeAdapter(opts: { views?: ViewRegistry; backend?: 'auto
       for (const m of mounted) m.view.dispose(m.handle, three);
       mounted.length = 0;
       const types = new Set([...doc.world, ...Object.values(doc.entities)].map((i) => i.type));
+      const mine = ++remountSeq;
       await Promise.all([...types].map((t) => views[t]?.preload?.())); // пресет мог добавить деревья, которых не было при первом mount
+      if (mine !== remountSeq) return; // за время загрузки пришла новая пересборка: монтирует она
       for (const inst of [...doc.world, ...Object.values(doc.entities)]) {
         const view = views[inst.type];
         if (view) mounted.push({ id: inst.id, view, handle: view.mount(three, inst) });
