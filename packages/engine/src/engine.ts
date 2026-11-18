@@ -15,6 +15,7 @@ type Snapshot = {
   camera: CameraSim;
   tracks: Record<string, Record<string, Track>>;
   unlinked: Record<string, string[]>;
+  handleVals: Record<string, Record<string, HandleValue>>;
 };
 
 /** Внутреннее состояние для адаптера рендера. Без three. Только чтение. */
@@ -226,11 +227,11 @@ export function createEngine(opts: { registry: Registry; fixedStep?: number; che
   }
 
   function snapshot(): Snapshot {
-    return structuredClone({ tick, nextEvent, rng: rngState, selves, camera, tracks, unlinked });
+    return structuredClone({ tick, nextEvent, rng: rngState, selves, camera, tracks, unlinked, handleVals });
   }
   function restore(s: Snapshot): void {
     const c = structuredClone(s);
-    tick = c.tick; nextEvent = c.nextEvent; rngState = c.rng; selves = c.selves; camera = c.camera; tracks = c.tracks; unlinked = c.unlinked;
+    tick = c.tick; nextEvent = c.nextEvent; rngState = c.rng; selves = c.selves; camera = c.camera; tracks = c.tracks; unlinked = c.unlinked; handleVals = c.handleVals;
     syncHandles();
   }
 
