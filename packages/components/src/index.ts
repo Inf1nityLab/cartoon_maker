@@ -16,4 +16,4 @@ export { Robot, RobotParams, ROBOT_PRESETS, robotDims, type RobotSelf, type Robo
 export { Road, buildRoad, RoadParams } from './road.ts';
 export { gridHeight, gridIndices, gridNormals, gridStep, sampleGrid, type GridSpec } from './terrain-grid.ts';
 export { Forces, ForcesParams, sunAt, sunStrength, moonStrength } from './forces.ts';
-export { Tree, TreeParams, TREE_PRESETS, RECIPES, SPECIES, ageStage, ageScale, ageGirth, ezOptions, type TreeSelf, type Species, type TreeShape } from './tree/index.ts';
+export { Tree, TreeParams, TREE_PRESETS, RECIPES, SPECIES, ageStage, ageScale, ageGirth, ezOptions, type TreeSelf, type Species, type BarkKind, type LeafKind, type TreeShape } from './tree/index.ts';

@@ -44,7 +44,8 @@ if (q.has('wind')) forcesParams.windStrength = num(q.get('wind'), 2);
 if (q.has('winddir')) forcesParams.windDirection = num(q.get('winddir'), 90);
 if (q.has('clouds')) forcesParams.cloudiness = num(q.get('clouds'), 0.15);
 if (q.has('fog')) forcesParams.fog = num(q.get('fog'), 0);
-let viewName = q.get('view') ?? 'general';
+const familyNames = show.kind === 'entity' ? show.family ?? [] : [];
+let viewName = q.get('view') ?? (q.get('family') === '1' && familyNames.length ? 'family' : 'general');
 let demoIndex: number | null = q.has('demo') ? num(q.get('demo'), 0) : null;
 const userEvents: { t: number; action: string; args: Record<string, unknown> }[] = [];
 if (q.has('gust')) userEvents.push({ t: num(q.get('gust'), 2), action: 'gust', args: { strength: 9, duration: 3 } });
@@ -56,13 +57,19 @@ const filmSize = { w: num(q.get('w'), 1280), h: num(q.get('h'), 720) };
 const FPS = num(q.get('fps'), 30);
 
 // ---------- сцена вокруг объекта ----------
-const VIEWS: Record<string, string> = { general: 'общий', close: 'крупно', ground: 'у земли', top: 'сверху' };
+const VIEWS: Record<string, string> = { general: 'общий', close: 'крупно', ground: 'у земли', top: 'сверху', ...(familyNames.length ? { family: 'семья' } : {}) };
+const isFamily = () => viewName === 'family' && familyNames.length > 0;
+const FAMILY_GAP = (show.size * 0.75);
 
 /** Камера витрины: именованные виды считаются от размера объекта (showcase.size) и высоты взгляда (showcase.eye). */
 function viewShot(name: string): { at: Vec3; look: Vec3; fov: number } {
   // объект меняет размер вместе с параметром height (если он есть): камера держит его в кадре
-  const k = typeof params.height === 'number' && typeof defaultsOf.height === 'number' ? Math.max(0.3, params.height / defaultsOf.height) : 1;
+  const k = typeof params.height === 'number' && typeof defaultsOf.height === 'number' ? Math.max(0.06, params.height / defaultsOf.height) : 1;
   const far = show.kind === 'world' ? 0.4 : 1; // объекты мира снимаются ближе, относительно их размера
+  if (name === 'family') { // все породы в ряд: камера на таком расстоянии, чтобы вошёл весь ряд
+    const width = (familyNames.length - 1) * FAMILY_GAP + show.size * 0.8;
+    return { at: [0, show.size * 0.45, -(width / (2 * Math.tan((42 / 2) * Math.PI / 180) * (16 / 9)) + show.size * 0.5)], look: [0, show.size * 0.4, 0], fov: 42 };
+  }
   const size = show.size * k, eye = (show.eye ?? show.size / 2) * k, a = (-35 * Math.PI) / 180;
   const at = (dist: number, h: number): Vec3 => [Math.sin(a) * dist, h, -Math.cos(a) * dist];
   switch (name) {
@@ -83,13 +90,21 @@ function build(): SceneDoc {
     else { s.world.use('Sky', {}); s.world.use('Forces', objectName === 'Forces' ? params : forcesParams); }
     if (objectName === 'Road') { s.path('road', { points: [[-45, 0, -22], [-14, 0, -6], [10, 0, 3], [45, 0, 30]] }); s.world.use('Road', params); }
     else if (show.kind === 'world' && !['Terrain', 'Sky', 'Forces'].includes(objectName)) s.world.use(objectName, params);
-    if (show.kind === 'entity') { s.places({ center: [0, 0, 0] }); s.add(objectName, params, { at: 'center', heading: 175, id: objId }); }
+    if (show.kind === 'entity' && isFamily()) {
+      const over = readOverrides();
+      familyNames.forEach((name, i) => {
+        const x = (i - (familyNames.length - 1) / 2) * FAMILY_GAP;
+        s.places({ [`f${i}`]: [x, 0, 0] });
+        const p = { ...(def.params as unknown as { parse(x: unknown): Params }).parse(ALL_PRESETS[name]), ...over };
+        s.add(objectName, p, { at: `f${i}`, heading: 175, id: i === 0 ? objId : `${objId}-${name}` });
+      });
+    } else if (show.kind === 'entity') { s.places({ center: [0, 0, 0] }); s.add(objectName, params, { at: 'center', heading: 175, id: objId }); }
     const v = viewShot(viewName);
     s.at(0).camera.shot('fixed', { at: v.at, look: v.look, fov: v.fov, aboveGround: true });
   }, { id: `library-${objectName}`, title: `Витрина: ${objectName}`, duration: DURATION, seed: 11, aspect: '16:9' });
   const events: TimelineEvent[] = [];
   const demo = demoIndex !== null ? show.demos?.[demoIndex] : undefined;
-  demo?.steps.forEach((st, i) => events.push({ id: `demo${i}`, t: st.t, target: objId, action: st.action, args: st.args }));
+  demo?.steps.forEach((st, i) => events.push({ id: `demo${i}`, t: st.t, target: st.world ? 'forces' : objId, action: st.action, args: st.args }));
   userEvents.forEach((e, i) => events.push({ id: `user${i}`, t: e.t, target: 'forces', action: e.action, args: e.args }));
   doc.timeline = [...doc.timeline, ...events].map((e, i) => ({ e, i })).sort((a, b) => a.e.t - b.e.t || a.i - b.i).map((x) => x.e);
   return doc;
@@ -233,7 +248,7 @@ function panels() {
   const vs = $('views'); vs.innerHTML = '';
   for (const [k, label] of Object.entries(VIEWS)) {
     const b = document.createElement('button'); b.textContent = label; b.className = k === viewName ? 'on' : '';
-    b.onclick = () => { viewName = k; panels(); setView(); };
+    b.onclick = () => { const was = isFamily(); viewName = k; panels(); if (was !== isFamily()) rebuild(true); else setView(); };
     vs.append(b);
   }
 }
