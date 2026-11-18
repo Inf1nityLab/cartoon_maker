@@ -30,13 +30,13 @@ export type TreeRecipe = {
 
 export const RECIPES: Record<Species, TreeRecipe> = {
   oak: {
-    evergreen: false, bark: 'oak', barkTint: 0xfff0d1, barkScale: [1, 10], levels: 3, angle: [54, 58, 32], children: [6, 4, 3], force: -0.01,
+    evergreen: false, bark: 'oak', barkTint: 0xd9b48a, barkScale: [1, 10], levels: 3, angle: [54, 58, 32], children: [6, 4, 3], force: -0.01,
     gnarliness: [0, -0.1, -0.15, 0.09], length: [37.24, 11.08, 12.39, 7.16], radius: [1.41, 0.9, 0.69, 1.19], sections: [8, 6, 3, 1], segments: [7, 5, 3, 3],
     start: [0.49, 0.06, 0.12], taper: [0.73, 0.42, 0.69, 0.75], twist: [-0.23, 0.42, 0, 0],
     leaf: 'oak', leafAngle: 42, leafCount: 18, leafStart: 0.16, leafSize: 2.5, leafVariance: 0.7, sway: { gain: 0.6, freq: 0.45 },
   },
   ash: {
-    evergreen: false, bark: 'oak', barkTint: 0xcecdbe, barkScale: [0.5, 5], levels: 3, angle: [48, 75, 60], children: [7, 4, 3], force: -0.06,
+    evergreen: false, bark: 'oak', barkTint: 0xcdb99f, barkScale: [0.5, 5], levels: 3, angle: [48, 75, 60], children: [7, 4, 3], force: -0.06,
     gnarliness: [0.03, 0.25, 0.2, 0.09], length: [43.47, 27.14, 9.51, 4.6], radius: [2, 0.63, 0.76, 0.7], sections: [12, 8, 6, 4], segments: [12, 6, 4, 3],
     start: [0.23, 0.33, 0], taper: [0.7, 0.7, 0.7, 0.7], twist: [0.09, -0.07, 0, 0],
     leaf: 'ash', leafAngle: 55, leafCount: 16, leafStart: 0, leafSize: 2.67, leafVariance: 0.72, sway: { gain: 0.85, freq: 0.5 },
@@ -68,19 +68,19 @@ export const RECIPES: Record<Species, TreeRecipe> = {
     leaf: 'pine', leafAngle: 55, leafCount: 36, leafStart: 0.05, leafSize: 1.3, leafVariance: 0.15, sway: { gain: 0.42, freq: 0.55 },
   },
   bush1: {
-    evergreen: false, bark: 'oak', barkTint: 0xcecdbe, barkScale: [0.5, 5], levels: 3, angle: [21.5, 62.6, 60], children: [7, 3, 2], force: -0.02,
+    evergreen: false, bark: 'oak', barkTint: 0xcdb99f, barkScale: [0.5, 5], levels: 3, angle: [21.5, 62.6, 60], children: [7, 3, 2], force: -0.02,
     gnarliness: [0.11, 0.09, 0.05, 0.09], length: [0.1, 15.3, 5.59, 4.6], radius: [0.58, 0.95, 0.76, 0.7], sections: [6, 6, 10, 10], segments: [4, 4, 4, 3],
     start: [0.53, 0.33, 0], taper: [0.7, 0.7, 0.7, 0.7], twist: [0.3, -0.07, 0, 0],
     leaf: 'ash', leafAngle: 55, leafCount: 12, leafStart: 0, leafSize: 2.45, leafVariance: 0.72, sway: { gain: 0.8, freq: 1.0 },
   },
   bush2: {
-    evergreen: false, bark: 'oak', barkTint: 0xcecdbe, barkScale: [0.5, 5], levels: 2, angle: [19.6, 27.4, 60], children: [10, 3, 2], force: -0.02,
+    evergreen: false, bark: 'oak', barkTint: 0xcdb99f, barkScale: [0.5, 5], levels: 2, angle: [19.6, 27.4, 60], children: [10, 3, 2], force: -0.02,
     gnarliness: [0.02, 0.11, 0.05, 0.09], length: [0.1, 19.6, 7.7, 4.6], radius: [0.58, 0.95, 0.76, 0.7], sections: [3, 4, 10, 10], segments: [4, 4, 4, 3],
     start: [0.64, 0.71, 0], taper: [0.7, 0.7, 0.7, 0.7], twist: [0.36, -0.04, 0, 0],
     leaf: 'aspen', leafAngle: 55, leafCount: 7, leafStart: 0, leafSize: 2.45, leafVariance: 0.72, sway: { gain: 0.9, freq: 1.0 },
   },
   bush3: {
-    evergreen: true, bark: 'oak', barkTint: 0xcecdbe, barkScale: [0.5, 5], levels: 3, angle: [66.5, 52.8, 0], children: [13, 4, 4], force: -0.007,
+    evergreen: true, bark: 'oak', barkTint: 0xcdb99f, barkScale: [0.5, 5], levels: 3, angle: [66.5, 52.8, 0], children: [13, 4, 4], force: -0.007,
     gnarliness: [0.05, 0.07, 0.05, 0.09], length: [10.96, 21.8, 13.1, 5.53], radius: [0.58, 0.95, 0.69, 0.74], sections: [4, 3, 3, 10], segments: [3, 3, 3, 3],
     start: [0.14, 0.29, 0], taper: [0.7, 0.7, 0.7, 0.7], twist: [0.3, -0.03, 0, 0],
     leaf: 'pine', leafAngle: 54, leafCount: 3, leafStart: 0.15, leafSize: 3.04, leafVariance: 0.46, sway: { gain: 0.7, freq: 1.0 },

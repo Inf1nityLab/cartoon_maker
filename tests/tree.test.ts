@@ -78,7 +78,7 @@ describe('Tree: возраст и сезон', () => {
   });
 
   it('сезон: густота листвы весна → лето → осень → голое; цвет жёлтеет; вечнозелёные не облетают', () => {
-    const at = (season: number, species = 'oak') => tree(makeEngine(scene({ species, season, leafColor: '#4a7a2a', autumnColor: '#d98a1c' })).seek(0));
+    const at = (season: number, species = 'oak') => tree(makeEngine(scene({ species, season, leafColor: '#5a9433', autumnColor: '#d98a1c' })).seek(0));
     const d = [0, 0.3, 0.4, 0.6, 0.8, 1].map((x) => at(x).leafDensity as number);
     expect(d[0]).toBeLessThan(d[1]!); // весной почки
     expect(d[1]).toBeCloseTo(1, 6);

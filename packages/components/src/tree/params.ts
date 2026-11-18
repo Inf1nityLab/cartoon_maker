@@ -17,7 +17,7 @@ export const TreeParams = z.object({
   leafSize: z.number().min(0.4).max(2.5).default(1).describe('размер листьев, множитель'),
   leafCount: z.number().min(0.2).max(1.5).default(1).describe('густота кроны (листьев на веточку), множитель'),
   barkTint: Hex.default('#ffffff').describe('оттенок коры (белый — как у породы)'),
-  leafColor: Hex.default('#4a7a2a').describe('цвет листвы летом'),
+  leafColor: Hex.default('#5a9433').describe('цвет листвы летом'),
   autumnColor: Hex.default('#d98a1c').describe('цвет листвы осенью (часть листьев краснее)'),
   age: z.number().min(0).max(1).default(0.5).describe('возраст: 0 саженец, 0.5 взрослое дерево, 1 старое (шире, реже крона)'),
   season: z.number().min(0).max(1).default(0.3).describe('сезон: 0 весна, 0.3 лето, 0.5 осень (жёлтая, красная), 0.8 листья опали, 1 зима'),
@@ -31,12 +31,12 @@ const P = (species: Species, o: Partial<TreeParams>): TreeParams => TreeParams.p
 
 /** Пресеты: порода + рост + цвета. Остальное — по умолчанию. */
 export const TREE_PRESETS: Record<string, TreeParams> = {
-  oak: P('oak', { seed: 35729, height: 12, leafColor: '#4a7a2a', autumnColor: '#c9791c' }),
-  ash: P('ash', { seed: 36330, height: 16, leafColor: '#5a8a35', autumnColor: '#e0b53a' }),
-  aspen: P('aspen', { seed: 18020, height: 15, leafColor: '#6f9a3a', autumnColor: '#f2c230' }),
-  birch: P('birch', { seed: 4411, height: 12, leafColor: '#7aa443', autumnColor: '#f0c63a' }),
-  pine: P('pine', { seed: 13977, height: 18, leafColor: '#2f5a33', autumnColor: '#2f5a33' }),
-  spruce: P('spruce', { seed: 2024, height: 20, leafColor: '#244a38', autumnColor: '#244a38' }),
+  oak: P('oak', { seed: 35729, height: 12, leafColor: '#5a9433', autumnColor: '#c9791c' }),
+  ash: P('ash', { seed: 36330, height: 16, leafColor: '#6aa03e', autumnColor: '#e0b53a' }),
+  aspen: P('aspen', { seed: 18020, height: 15, leafColor: '#80ae44', autumnColor: '#f2c230' }),
+  birch: P('birch', { seed: 4411, height: 12, leafColor: '#8ab84c', autumnColor: '#f0c63a' }),
+  pine: P('pine', { seed: 13977, height: 18, leafColor: '#2f6038', autumnColor: '#2f6038' }),
+  spruce: P('spruce', { seed: 2024, height: 20, leafColor: '#2a5a42', autumnColor: '#2a5a42' }),
   bush1: P('bush1', { seed: 45590, height: 1.6, leafColor: '#58863a', autumnColor: '#d08a30' }),
   bush2: P('bush2', { seed: 45591, height: 1.3, leafColor: '#6a9a3a', autumnColor: '#e4a040' }),
   bush3: P('bush3', { seed: 31343, height: 1.8, leafColor: '#3b6b3a', autumnColor: '#3b6b3a' }),
