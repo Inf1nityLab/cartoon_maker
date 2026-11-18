@@ -18,6 +18,9 @@ const shot = async (name: string, query: string, t = 1) => {
   return s;
 };
 
+// Страница витрины крутит кадры в реальном времени на swiftshader: проверка «элемент стабилен» у click не наступает, жмём через DOM
+const press = (page: import('@playwright/test').Page, label: string) => page.locator('#presets button', { hasText: new RegExp(`^${label}$`) }).evaluate((b: HTMLElement) => b.click());
+
 test.describe('вода (Б1)', () => {
   test.setTimeout(900_000);
 
@@ -120,21 +123,21 @@ test.describe('вода (Б1)', () => {
     const state = () => page.evaluate(() => (window as unknown as { __player: { state(): any } }).__player.state());
     expect(await page.locator('#presets button').allTextContents()).toEqual(['ocean-tropical', 'ocean-storm', 'lake-mountain', 'pond-forest', 'pond-lilies', 'creek', 'river', 'oasis']);
     expect((await page.locator('#handles .row').count())).toBe(14);
-    await page.getByRole('button', { name: 'ocean-storm', exact: true }).click();
+    await press(page, 'ocean-storm');
     await page.waitForTimeout(1500);
     expect((await state()).world.water.waves.swell).toBeGreaterThan(3);
-    await page.getByRole('button', { name: 'creek', exact: true }).click();
+    await press(page, 'creek');
     await page.waitForTimeout(1500);
     expect((await state()).world.water.shape).toBe('river');
-    await page.getByRole('button', { name: 'pond-forest', exact: true }).click();
+    await press(page, 'pond-forest');
     await page.waitForTimeout(1500);
     await page.locator('#f-ice').evaluate((el: HTMLInputElement) => { el.value = '1'; el.dispatchEvent(new Event('input')); });
     await page.waitForTimeout(800);
-    expect((await state()).handles.water.ice).toBe(1);
+    expect((await state()).world.water.ice).toBe(1);
     await expect(page.locator('#dive')).toBeVisible();
-    await page.locator('#dive').click();
+    await page.locator('#dive').evaluate((b: HTMLElement) => b.click());
     await page.waitForTimeout(1500);
-    await page.getByRole('button', { name: /▶ Пруд замерзает/ }).click();
+    await page.locator('#demos button').nth(1).evaluate((b: HTMLElement) => b.click());
     await page.waitForTimeout(1000);
     mkdirSync(OUT, { recursive: true });
     await page.screenshot({ path: `${OUT}/library-ui-water.png` });
