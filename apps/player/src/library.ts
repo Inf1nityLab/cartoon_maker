@@ -9,7 +9,7 @@ import { hashWorldState, type SceneDoc, type TimelineEvent, type Vec3 } from '@c
  * Витрина объектов: library.html?object=<тип>[&preset=…][&time=<часы>]. Каркас для всех объектов мира:
  * слева пресеты и облик, справа ручки из схемы (с единицами и описанием в подсказке), сверху силы мира,
  * внизу время и демо ручек. Сам объект ничего не знает про витрину, кроме `showcase` в своём компоненте.
- * Параметры URL (для e2e): object, preset, time, t, view, wind, winddir, clouds, fog, gust=<t>, demo=<номер>, film=1&w=&h=,
+ * Параметры URL (для e2e): object, preset, time, t, view, family=1, wind, winddir, clouds, fog, temp, gust=<t>, demo=<номер>, film=1&w=&h=,
  * p.<параметр>=<значение> (параметры и ручки объекта), backend=webgl2.
  */
 
@@ -44,6 +44,7 @@ if (q.has('wind')) forcesParams.windStrength = num(q.get('wind'), 2);
 if (q.has('winddir')) forcesParams.windDirection = num(q.get('winddir'), 90);
 if (q.has('clouds')) forcesParams.cloudiness = num(q.get('clouds'), 0.15);
 if (q.has('fog')) forcesParams.fog = num(q.get('fog'), 0);
+if (q.has('temp')) forcesParams.temperature = num(q.get('temp'), 15);
 const familyNames = show.kind === 'entity' ? show.family ?? [] : [];
 let viewName = q.get('view') ?? (q.get('family') === '1' && familyNames.length ? 'family' : 'general');
 let demoIndex: number | null = q.has('demo') ? num(q.get('demo'), 0) : null;
@@ -59,7 +60,7 @@ const FPS = num(q.get('fps'), 30);
 // ---------- сцена вокруг объекта ----------
 const VIEWS: Record<string, string> = { general: 'общий', close: 'крупно', ground: 'у земли', top: 'сверху', ...(familyNames.length ? { family: 'семья' } : {}) };
 const isFamily = () => viewName === 'family' && familyNames.length > 0;
-const FAMILY_GAP = (show.size * 0.75);
+const FAMILY_GAP = show.size * 1.8;
 
 /** Камера витрины: именованные виды считаются от размера объекта (showcase.size) и высоты взгляда (showcase.eye). */
 function viewShot(name: string): { at: Vec3; look: Vec3; fov: number } {
@@ -67,8 +68,8 @@ function viewShot(name: string): { at: Vec3; look: Vec3; fov: number } {
   const k = typeof params.height === 'number' && typeof defaultsOf.height === 'number' ? Math.max(0.06, params.height / defaultsOf.height) : 1;
   const far = show.kind === 'world' ? 0.4 : 1; // объекты мира снимаются ближе, относительно их размера
   if (name === 'family') { // все породы в ряд: камера на таком расстоянии, чтобы вошёл весь ряд
-    const width = (familyNames.length - 1) * FAMILY_GAP + show.size * 0.8;
-    return { at: [0, show.size * 0.45, -(width / (2 * Math.tan((42 / 2) * Math.PI / 180) * (16 / 9)) + show.size * 0.5)], look: [0, show.size * 0.4, 0], fov: 42 };
+    const width = (familyNames.length - 1) * FAMILY_GAP + show.size * 1.6, eye = show.eye ?? show.size / 2;
+    return { at: [0, eye * 1.2, -(width / (2 * Math.tan((42 / 2) * Math.PI / 180) * (16 / 9)) + show.size)], look: [0, eye * 1.5, 0], fov: 42 };
   }
   const size = show.size * k, eye = (show.eye ?? show.size / 2) * k, a = (-35 * Math.PI) / 180;
   const at = (dist: number, h: number): Vec3 => [Math.sin(a) * dist, h, -Math.cos(a) * dist];
@@ -127,7 +128,7 @@ if (!load()) throw new Error(msg.textContent ?? '');
 const backend = q.get('backend') === 'webgl2' ? 'webgl2' : 'auto';
 const taa = { enabled: q.get('taa') !== '0', accumulate: Number(q.get('accum') ?? 0), warmup: Number(q.get('warmup') ?? 3) };
 const fx = q.get('fx') !== '0';
-const adapter = createThreeAdapter(film ? { backend, taa, fx, mode: 'film', filmSize, pixelRatio: 1 } : { backend, taa, fx });
+const adapter = createThreeAdapter(film ? { backend, taa, fx, trackGpu: q.get('gpu') === '1', mode: 'film', filmSize, pixelRatio: 1 } : { backend, taa, fx, trackGpu: q.get('gpu') === '1' });
 const canvas = $<HTMLCanvasElement>('view');
 await adapter.mount(canvas, doc, () => engine.sim());
 

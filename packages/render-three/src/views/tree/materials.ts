@@ -52,8 +52,8 @@ export function createTreeLook(bark: BarkTex, leaf: LeafTex, init: { leaf: strin
   const barkMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 });
   const barkTex = texture(bark.color, uv());
   const snowUp = u.snow.mul(smoothstep(0.1, 0.65, normalWorld.y));
-  barkMat.colorNode = mix(barkTex.rgb.mul(u.barkTint).mul(1.8), SNOW, snowUp);
-  barkMat.emissiveNode = barkTex.rgb.mul(0.08);
+  barkMat.colorNode = mix(barkTex.rgb.mul(u.barkTint).mul(3), SNOW, snowUp);
+  barkMat.emissiveNode = barkTex.rgb.mul(0.12);
   barkMat.normalNode = normalMap(texture(bark.normal, uv()), vec2(0.8, 0.8));
   barkMat.positionNode = move(false);
 
