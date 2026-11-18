@@ -78,7 +78,7 @@ test.describe('деревья (Б2): ветер', () => {
       const page = await (await browser.newContext({ viewport: { width: W, height: H } })).newPage();
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));
-      await openPlayer(page, lib(`object=Tree&preset=${preset}&view=close&time=11&clouds=0&wind=5&winddir=90&gust=1&p.height=12`));
+      await openPlayer(page, lib(`object=Tree&preset=${preset}&view=close&time=11&clouds=0&wind=8&winddir=90&gust=1&p.height=12`));
       const amp: number[] = [], hashes: string[] = [];
       for (const [i, t] of times.entries()) {
         const f = await frameAt(page, t);
@@ -118,7 +118,7 @@ test.describe('деревья (Б2): ветер', () => {
   });
 
   test('TAA в листве на ветру: ошибка против накопления мала, шлейфа нет (серия кадров подряд)', async () => {
-    const q = (extra: string) => lib(`object=Tree&preset=birch&view=close&time=11&clouds=0&wind=7&winddir=90&p.height=12${extra}`, '&w=640&h=360');
+    const q = (extra: string, wind = 7) => lib(`object=Tree&preset=birch&view=close&time=11&clouds=0&wind=${wind}&winddir=90&p.height=12${extra}`, '&w=640&h=360');
     const run = async (query: string, action: string, noPrev = false) => {
       const browser = await chromium.launch({ channel: 'chrome', args: ARGS });
       try {
@@ -141,14 +141,14 @@ test.describe('деревья (Б2): ветер', () => {
       return { meanAbs: sum / (a.length / 4 * 3), shareOver12: big / (a.length / 4) };
     };
     const T = 3 + 9 * DT; // девять кадров подряд
-    const calm = '&wind=0.01'; // почти без ветра: что остаётся от самого TAA на листве
-    const taaCalm = await run(q(calm), `p.play(3, ${T})`);
+    const calmWind = 0.01; // почти без ветра: что остаётся от самого TAA на листве
+    const taaCalm = await run(q('', calmWind), `p.play(3, ${T})`);
     const taa = await run(q(''), `p.play(3, ${T})`);
     const noPrev = await run(q(''), `p.play(3, ${T})`, true);
     const off = await run(q('&taa=0'), `p.play(3, ${T})`);
     const ref = await run(q('&accum=16&taa=0'), `p.show(${T})`);
-    const refCalm = await run(q(`${calm}&accum=16&taa=0`), `p.show(${T})`);
-    const next = await run(q(calm), `p.play(3, ${T + DT})`);
+    const refCalm = await run(q('&accum=16&taa=0', calmWind), `p.show(${T})`);
+    const next = await run(q('', calmWind), `p.play(3, ${T + DT})`);
     const r = {
       windTaaVsAccum16: stats(taa, ref), windNoAA: stats(off, ref), windTaaWithoutPrevPosition: stats(noPrev, ref),
       calmTaaVsAccum16: stats(taaCalm, refCalm), calmFrameToFrame: stats(taaCalm, next),

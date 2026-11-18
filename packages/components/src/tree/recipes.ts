@@ -100,7 +100,7 @@ export type TreeShape = { species: Species; seed: number; trunk: number; branchi
 /** Ступень возраста 0 (саженец), 1 (молодое), 2 (взрослое и старое). */
 export function ageStage(age: number): 0 | 1 | 2 { return age < 0.1 ? 0 : age < 0.28 ? 1 : 2; }
 
-const STAGE_CHILDREN = [0.4, 0.7, 1], STAGE_LEAVES = [0.5, 0.8, 1];
+const STAGE_CHILDREN = [0.8, 0.9, 1], STAGE_LEAVES = [0.6, 0.85, 1];
 
 /** Настройки генератора ez-tree (в виде JSON, как у его `loadFromJson`). */
 export function ezOptions(p: TreeShape, stage: 0 | 1 | 2): Record<string, unknown> {
