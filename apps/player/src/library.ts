@@ -31,7 +31,7 @@ const fields = paramFields(def);
 
 // ---------- состояние витрины ----------
 type Params = Record<string, unknown>;
-const FORCES_DEFAULT: Params = { time: 11, windStrength: 2, windDirection: 90, gustiness: 0.3, cloudiness: 0.15, fog: 0 };
+const FORCES_DEFAULT: Params = { time: 11, windStrength: 2, windDirection: 90, gustiness: 0.3, cloudiness: 0.15, fog: 0, temperature: 15 };
 const forcesParams: Params = { ...FORCES_DEFAULT };
 const readOverrides = (): Params => Object.fromEntries([...q.entries()].filter(([k]) => k.startsWith('p.')).map(([k, v]) => [k.slice(2), Number.isFinite(Number(v)) && v !== '' ? Number(v) : v === 'true' ? true : v === 'false' ? false : v]));
 let presetName = q.get('preset') && ALL_PRESETS[q.get('preset')!] ? q.get('preset')! : show.defaultPreset ?? Object.keys(ALL_PRESETS)[0] ?? '';
@@ -42,6 +42,7 @@ const defaults = (): Params => (def.params as unknown as { parse(x: unknown): Pa
 const defaultsOf = (def.params as unknown as { parse(x: unknown): Params }).parse(objectName === 'Road' ? { path: 'road' } : {});
 let params: Params = { ...defaults(), ...readOverrides() };
 if (objectName === 'Forces') { Object.assign(forcesParams, params); params = forcesParams; }
+if (objectName !== 'Forces') Object.assign(forcesParams, setupOf()?.forces);
 const timeQ = q.get('time'); if (timeQ !== null) forcesParams.time = num(timeQ, 11);
 if (q.has('wind')) forcesParams.windStrength = num(q.get('wind'), 2);
 if (q.has('winddir')) forcesParams.windDirection = num(q.get('winddir'), 90);
@@ -93,9 +94,17 @@ function build(): SceneDoc {
     if (objectName === 'Terrain') s.world.use('Terrain', params);
     else s.world.use('Terrain', hills ? (setup?.terrain ?? { style: 'hills', seed: 7 }) : { style: 'flat' });
     if (setup?.path) s.path('water', { points: setup.path });
-    if (hills && objectName !== 'Water') s.world.use('Water', {});
+    if (hills && objectName !== 'Water' && !(objectName === 'Terrain' && setup?.world)) s.world.use('Water', {});
     if (objectName === 'Sky') s.world.use('Sky', params);
     else { s.world.use('Sky', {}); s.world.use('Forces', objectName === 'Forces' ? params : forcesParams); }
+    if (objectName === 'Terrain') {
+      // вода и деревья рядом с землёй (под пресет): берег, мокрый песок и подстилку видно только с ними
+      for (const w of setup?.world ?? []) s.world.use(w.type, w.params);
+      (setup?.entities ?? []).forEach((e, i) => {
+        s.places({ [`ent${i}`]: [e.at[0], 0, e.at[1]] });
+        s.add(e.type, e.params ?? {}, { at: `ent${i}`, heading: e.heading ?? 0, id: `${e.type.toLowerCase()}-${i}` });
+      });
+    }
     if (objectName === 'Road') { s.path('road', { points: [[-45, 0, -22], [-14, 0, -6], [10, 0, 3], [45, 0, 30]] }); s.world.use('Road', params); }
     else if (show.kind === 'world' && !['Terrain', 'Sky', 'Forces'].includes(objectName)) s.world.use(objectName, objectName === 'Water' && q.has('touch') ? { ...params, touchers: ['rover'] } : params);
     if (objectName === 'Water' && q.has('touch')) {
@@ -180,9 +189,9 @@ function draw(jump = false) {
 const clock = (h: number) => { const m = Math.round(h * 60) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
 
 /** Параметры или ручки изменились: пересобрать сцену. remount — если меняется то, что вид читает только при создании (облик). */
-function rebuild(remount: boolean) {
+async function rebuild(remount: boolean) {
   if (!load()) return;
-  if (remount) adapter.remount(doc);
+  if (remount) await adapter.remount(doc);
   draw(true);
 }
 
@@ -236,7 +245,7 @@ function panels() {
     b.onclick = () => {
       presetName = name;
       const next = { ...(def!.params as unknown as { parse(x: unknown): Params }).parse(ALL_PRESETS[name]) };
-      if (objectName === 'Forces') Object.assign(forcesParams, next); else params = next;
+      if (objectName === 'Forces') Object.assign(forcesParams, next); else { params = next; if (objectName !== 'Sky') Object.assign(forcesParams, setupOf()?.forces); }
       panels(); rebuild(true);
     };
     pr.append(b);
@@ -259,7 +268,7 @@ function panels() {
 
   // силы мира (сверху): у Sky своё ручное солнце
   const fc = $('forces'); fc.querySelectorAll('.fc').forEach((n) => n.remove());
-  const spec: [string, string, number, number, string][] = [['time', 'время', 0, 24, 'ч'], ['windStrength', 'ветер', 0, 20, 'м/с'], ['windDirection', 'куда дует', 0, 360, '°'], ['cloudiness', 'облачность', 0, 1, ''], ['fog', 'туман', 0, 1, '']];
+  const spec: [string, string, number, number, string][] = [['time', 'время', 0, 24, 'ч'], ['windStrength', 'ветер', 0, 20, 'м/с'], ['windDirection', 'куда дует', 0, 360, '°'], ['cloudiness', 'облачность', 0, 1, ''], ['fog', 'туман', 0, 1, ''], ['temperature', 'температура', -20, 35, '°C']];
   for (const [name, label, min, max, unit] of spec) {
     const w = document.createElement('label'); w.className = 'fc'; w.title = `${label}${unit ? `, ${unit}` : ''}`;
     const r = document.createElement('input'); r.type = 'range'; r.min = String(min); r.max = String(max); r.step = String((max - min) / 480); r.id = `force-${name}`;
