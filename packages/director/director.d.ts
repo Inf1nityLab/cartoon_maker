@@ -428,7 +428,7 @@ export interface TreeParams {
   leafCount?: number;
   /** оттенок коры (белый — как у породы); по умолчанию "#ffffff" */
   barkTint?: string /* '#rrggbb' */;
-  /** цвет листвы летом; по умолчанию "#4a7a2a" */
+  /** цвет листвы летом; по умолчанию "#5a9433" */
   leafColor?: string /* '#rrggbb' */;
   /** цвет листвы осенью (часть листьев краснее); по умолчанию "#d98a1c" */
   autumnColor?: string /* '#rrggbb' */;

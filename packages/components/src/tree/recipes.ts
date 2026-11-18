@@ -62,7 +62,7 @@ export const RECIPES: Record<Species, TreeRecipe> = {
   },
   // ель (наша): узкий конус, короткие ветви почти горизонтально
   spruce: {
-    evergreen: true, bark: 'pine', barkTint: 0xb9a99a, barkScale: [1, 1], levels: 1, angle: [88, 16, 60], children: [120, 3, 5], force: -0.012,
+    evergreen: true, bark: 'pine', barkTint: 0xb9a99a, barkScale: [1, 1], levels: 1, angle: [88, 16, 60], children: [120, 3, 5], force: -0.002,
     gnarliness: [0.03, 0.06, 0, 0], length: [56, 13, 14.08, 1], radius: [0.9, 0.3, 0.7, 0.7], sections: [12, 8, 8, 6], segments: [8, 5, 4, 3],
     start: [0.12, 0.14, 0.3], taper: [0.8, 0.7, 0.7, 0.7], twist: [0, 0, 0, 0],
     leaf: 'pine', leafAngle: 55, leafCount: 36, leafStart: 0.05, leafSize: 1.3, leafVariance: 0.15, sway: { gain: 0.42, freq: 0.55 },
