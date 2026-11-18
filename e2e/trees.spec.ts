@@ -16,7 +16,7 @@ const shot = async (name: string, query: string, t = 1) => {
   return s;
 };
 const SPECIES = ['oak', 'ash', 'aspen', 'birch', 'pine', 'spruce', 'bush1', 'bush2', 'bush3', 'willow'];
-const BASEQ = 'object=Tree&view=general&time=11&clouds=0&wind=0.5&gust=-1';
+const BASEQ = 'object=Tree&view=general&time=11&clouds=0&wind=0.5';
 
 test.describe('деревья (Б2): кадры', () => {
   test.setTimeout(900_000);
