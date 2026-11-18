@@ -41,7 +41,7 @@ function makeUniforms(seed: number) {
     layers: { swell: layer(), wind: layer(), ripple: layer() } as Record<WaveLayerName, Layer>,
     rings: Array.from({ length: MAX_RINGS }, () => uniform(new THREE.Vector4(0, 0, 0, 0))),
     shallow: colorU(), deep: colorU(), bed: colorU(),
-    bedBlend: uniform(0), vis: uniform(5), reflection: uniform(0.8), foam: uniform(0.5), ice: uniform(0), foamWave: uniform(0), flowOn: uniform(0),
+    bedBlend: uniform(0), vis: uniform(5), kScale: uniform(1), reflection: uniform(0.8), foam: uniform(0.5), ice: uniform(0), foamWave: uniform(0), flowOn: uniform(0),
     sunDir: vec3U(0, 1, 0), sunRad: vec3U(), light: vec3U(), skyHorizon: colorU(), skyZenith: colorU(),
     uwColor: colorU(), uwLight: uniform(1),
     mapOrigin: uniform(new THREE.Vector2()), mapSize: uniform(new THREE.Vector2(1, 1)),
@@ -52,8 +52,8 @@ function makeUniforms(seed: number) {
 }
 
 /** Волны: сумма мод трёх слоёв (та же формула, что waveHeightAt). q — точка с учётом сноса течением. Возвращает высоту, градиент, лапласиан, сдвиг и якобиан сдвига. */
-function waves(u: U, q: N, depth: N, want: { grad?: boolean; lap?: boolean; disp?: boolean; jac?: boolean }) {
-  const big = smoothstep(0, 1.2, depth), small = smoothstep(0, 0.15, depth);
+function waves(u: U, q: N, depth: N, want: { grad?: boolean; lap?: boolean; disp?: boolean; jac?: boolean }, ripFade: N = float(1)) {
+  const big = smoothstep(0, 1.2, depth), small = smoothstep(0, 0.15, depth).mul(ripFade);
   let h: N = float(0), gx: N = float(0), gz: N = float(0), lap: N = float(0), dX: N = float(0), dZ: N = float(0);
   let jxx: N = float(0), jzz: N = float(0), jxz: N = float(0);
   for (const name of ['swell', 'wind', 'ripple'] as const) {
@@ -133,7 +133,8 @@ function surfaceMaterial(u: U, map: WaterMap, open: boolean): THREE.NodeMaterial
     const mv = mapTex.sample(mapUv(u, p));
     const sd = mv.r, depth = max(sd, 0), shore = smoothstep(0.0, 0.04, sd);
     const q = p.sub(vec2(mv.g, mv.b).mul(u.drift));
-    const w = waves(u, q, depth, { grad: true, jac: true });
+    const dist = length(cameraPosition.sub(P));
+    const w = waves(u, q, depth, { grad: true, jac: true }, float(1).sub(smoothstep(40, 160, dist).mul(0.75)));
     const rg = rings(u, p);
 
     // лёд: кромка у берега, мелкие поля; крупный шум задаёт, где лёд встаёт первым
@@ -153,15 +154,18 @@ function surfaceMaterial(u: U, map: WaterMap, open: boolean): THREE.NodeMaterial
     const Rs = vec3(R.x, max(R.y, 0.01), R.z);
     const sky = skyColor(u, Rs);
     const rl = max(dot(Rs, u.sunDir), 0);
-    const spec = u.sunRad.mul(pow(rl, 1400).mul(120).add(pow(rl, 110).mul(1.1)));
-    const refl = sky.add(spec).mul(fres).mul(u.reflection);
+    const spec = u.sunRad.mul(pow(rl, 2200).mul(90).add(pow(rl, 260).mul(0.22)));
+    const refl = sky.mul(0.55).add(spec).mul(fres).mul(u.reflection);
     // вода: прозрачность по глубине и ясности, цвет мелководья переходит в цвет глубины
-    const T = exp(depth.div(max(u.vis, 0.05).mul(max(cosV, 0.3))).negate());
-    const mixD = float(1).sub(exp(depth.div(u.vis.mul(0.75)).negate()));
+    // поглощение по каналам: красный гаснет первым, дно уходит в бирюзу и синеву; kScale растёт с мутностью
+    const Tc = exp(vec3(0.55, 0.13, 0.07).mul(u.kScale).mul(depth.div(max(cosV, 0.3))).negate());
+    const T = Tc.y;
+    const mixD = float(1).sub(exp(depth.mul(u.kScale).mul(0.22).negate()));
     const bodyCol = mix(u.shallow, u.deep, mixD).mul(u.light);
-    const sandCol = u.bed.mul(u.light);
-    const body = bodyCol.mul(float(1).sub(T)).add(sandCol.mul(T).mul(u.bedBlend));
-    const aWater = float(1).sub(T.mul(float(1).sub(u.bedBlend)));
+    const sandCol = u.bed.mul(u.light).mul(0.42);
+    const sandK = u.bedBlend.mul(exp(depth.mul(u.kScale).mul(0.3).negate())); // песок виден до глубины, дальше — только вода
+    const body = bodyCol.mul(float(1).sub(T)).add(sandCol.mul(Tc).mul(sandK));
+    const aWater = float(1).sub(T.mul(float(1).sub(sandK)));
     let rgb: N = body.add(refl).mul(shore);
     let a: N = aWater.mul(shore);
 
@@ -180,7 +184,7 @@ function surfaceMaterial(u: U, map: WaterMap, open: boolean): THREE.NodeMaterial
 
     // лёд: молочно-голубой, трещины, глянцевое отражение неба
     const crack = float(1).sub(smoothstep(0.0, 0.06, abs(mx_noise_float(p.mul(1.6).add(3.1)))));
-    const iceCol = mix(vec3(0.66, 0.82, 0.9), vec3(0.9, 0.96, 0.98), nM.mul(0.5).add(0.5)).mul(u.light.mul(0.95).add(0.05)).mul(float(1).sub(crack.mul(0.3)));
+    const iceCol = mix(vec3(0.66, 0.82, 0.9), vec3(0.9, 0.96, 0.98), nM.mul(0.5).add(0.5)).mul(u.light.mul(0.95).add(0.05)).mul(float(1).sub(crack.mul(0.5))).mul(0.85);
     const iceRefl = sky.mul(0.06).add(spec.mul(0.25)).mul(float(1).sub(float(0.5).mul(cosV)).mul(float(0.4)).add(fres));
     const ice = iceMask.mul(0.93).mul(shore);
     const above = vec4(mix(rgb, iceCol.add(iceRefl), ice), ice.add(float(1).sub(ice).mul(a)));
@@ -221,7 +225,7 @@ function bedMaterial(u: U, map: WaterMap): THREE.NodeMaterial {
     const wet = smoothstep(0.0, 0.12, mv.r);
     const sh = vec2(u.sunDir.x, u.sunDir.z).div(max(u.sunDir.y, 0.2)).mul(0.75).mul(min(depth, 6));
     const q = p.add(sh).sub(vec2(mv.g, mv.b).mul(u.drift));
-    const w = waves(u, q, depth, { lap: true });
+    const w = waves(u, q, depth, { lap: true }, float(1).sub(smoothstep(5, 18, length(cameraPosition.sub(P)))));
     const rg = rings(u, p);
     const d = min(depth, 2.5);
     // якобиан преломления: 1 + c·d·Δh; Δh < 0 на выпуклых гребнях — лучи собираются
@@ -358,6 +362,7 @@ export const WaterView = defineView<Handle>('Water', {
     u.foamWave.value = Math.min(1, (sea.wind.height + sea.swell.height * 0.5) / 1.6);
     u.shallow.value.set(self.shallowColor); u.deep.value.set(self.deepColor);
     u.vis.value = 0.35 + 18 * self.clarity ** 1.6;
+    u.kScale.value = 1 / (0.25 + 4 * self.clarity * self.clarity);
     u.reflection.value = self.reflection;
     u.foam.value = self.foam;
     u.ice.value = self.iceEff;
@@ -379,7 +384,8 @@ export const WaterView = defineView<Handle>('Water', {
     (u.light.value as THREE.Vector3).set(sunRad.x * Math.max(dir.y, 0) + sky.r, sunRad.y * Math.max(dir.y, 0) + sky.g, sunRad.z * Math.max(dir.y, 0) + sky.b).multiplyScalar(1 / PI);
     const bg = three.scene.background instanceof THREE.Color ? three.scene.background : h.tmpB.set('#8ec1ee');
     (u.skyHorizon.value as THREE.Color).copy(bg);
-    (u.skyZenith.value as THREE.Color).copy(bg).multiplyScalar(0.62);
+    (u.skyHorizon.value as THREE.Color).multiplyScalar(0.9);
+    (u.skyZenith.value as THREE.Color).copy(bg).multiplyScalar(0.55);
     const sunUp = Math.max(0, Math.min(1, dir.y * 4)) * (sun.intensity > 0.01 ? 1 : 0);
     u.bedLight.value = sunUp * Math.max(0, 1 - self.iceEff * 0.9);
     u.caustic.value = 1;
