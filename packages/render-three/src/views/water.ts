@@ -47,7 +47,7 @@ function makeUniforms(seed: number) {
     mapOrigin: uniform(new THREE.Vector2()), mapSize: uniform(new THREE.Vector2(1, 1)),
     center: uniform(new THREE.Vector2()), ripple01: uniform(0),
     bedLight: uniform(0), caustic: uniform(0), uwK: uniform(0),
-    camCell: uniform(new THREE.Vector2()), shaftY: uniform(0), shaftK: uniform(0), shaftShear: uniform(new THREE.Vector2()),
+    camCell: uniform(new THREE.Vector2()), shaftY: uniform(1e6), shaftK: uniform(0), shaftShear: uniform(new THREE.Vector2()),
   };
 }
 
@@ -104,6 +104,13 @@ const skyColor = (u: U, r: N) => {
   return base.add(u.sunRad.mul(glow).mul(0.12));
 };
 
+/**
+ * ТОЧКА РАСШИРЕНИЯ (задача Б1в): отражение предметов. Сейчас вода отражает только небо. Б1в добавит сюда отражение в экранном
+ * пространстве (по нашей глубине и цвету кадра): вернуть mix(небо, цвет кадра в точке отражённого луча, вес попадания).
+ * R — отражённый луч (мир), P — точка поверхности, N — нормаль волн.
+ */
+const reflectedColor = (u: U, R: N, _P: N, _N: N) => skyColor(u, R);
+
 function surfaceMaterial(u: U, map: WaterMap, open: boolean): THREE.NodeMaterial {
   const mat = new THREE.NodeMaterial();
   mat.transparent = true; mat.depthWrite = false; mat.side = THREE.DoubleSide;
@@ -152,7 +159,7 @@ function surfaceMaterial(u: U, map: WaterMap, open: boolean): THREE.NodeMaterial
     const fres = float(0.02).add(float(0.98).mul(pow(float(1).sub(cosV), 5)));
     const R = reflect(V.negate(), Nf);
     const Rs = vec3(R.x, max(R.y, 0.01), R.z);
-    const sky = skyColor(u, Rs);
+    const sky = reflectedColor(u, Rs, P, Nf);
     const rl = max(dot(Rs, u.sunDir), 0);
     const spec = u.sunRad.mul(pow(rl, 2200).mul(90).add(pow(rl, 260).mul(0.22)));
     const refl = sky.mul(0.55).add(spec).mul(fres).mul(u.reflection);
@@ -284,7 +291,7 @@ function shaftsMesh(u: U): THREE.Mesh {
     return vec4(u.sunRad.mul(0.5).add(u.uwColor.mul(0.2)).mul(k), k);
   })();
   const mesh = new THREE.Mesh(g, mat);
-  mesh.frustumCulled = false; mesh.visible = false; mesh.renderOrder = 3;
+  mesh.frustumCulled = false; mesh.renderOrder = 3;
   return mesh;
 }
 
@@ -410,8 +417,9 @@ export const WaterView = defineView<Handle>('Water', {
     const k = Math.max(0, Math.min(1, below / 0.35));
     h.under = k;
     const fog = three.scene.fog;
-    h.shafts.visible = below > 0;
+    // меш лучей виден всегда, чтобы шейдер собрался в прогреве, а не при первом нырке; над водой он вынесен за кадр
     if (below <= 0) {
+      u.shaftY.value = 1e6;
       if (h.ownFog && fog instanceof THREE.Fog) { fog.near = 1e5; fog.far = 2e5; }
       if (h.ownBg) { three.scene.background = null; h.ownBg = false; }
       return;
