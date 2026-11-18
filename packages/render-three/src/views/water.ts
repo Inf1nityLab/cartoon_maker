@@ -161,14 +161,14 @@ function surfaceMaterial(u: U, map: WaterMap, open: boolean): THREE.NodeMaterial
     const Rs = vec3(R.x, max(R.y, 0.01), R.z);
     const sky = reflectedColor(u, Rs, P, Nf);
     const rl = max(dot(Rs, u.sunDir), 0);
-    const spec = u.sunRad.mul(pow(rl, 2200).mul(90).add(pow(rl, 260).mul(0.22)));
-    const refl = sky.mul(0.55).add(spec).mul(fres).mul(u.reflection);
+    const spec = u.sunRad.mul(pow(rl, 1600).mul(140).add(pow(rl, 260).mul(0.3)));
+    const refl = sky.mul(0.4).add(spec).mul(fres).mul(u.reflection);
     // вода: прозрачность по глубине и ясности, цвет мелководья переходит в цвет глубины
     // поглощение по каналам: красный гаснет первым, дно уходит в бирюзу и синеву; kScale растёт с мутностью
     const Tc = exp(vec3(0.55, 0.13, 0.07).mul(u.kScale).mul(depth.div(max(cosV, 0.3))).negate());
     const T = Tc.y;
-    const mixD = float(1).sub(exp(depth.mul(u.kScale).mul(0.22).negate()));
-    const bodyCol = mix(u.shallow, u.deep, mixD).mul(u.light);
+    const mixD = float(1).sub(exp(depth.mul(u.kScale).mul(0.5).negate()));
+    const bodyCol = mix(u.shallow, u.deep, mixD).mul(u.light).mul(0.85);
     const sandCol = u.bed.mul(u.light).mul(0.42);
     const sandK = u.bedBlend.mul(exp(depth.mul(u.kScale).mul(0.3).negate())); // песок виден до глубины, дальше — только вода
     const body = bodyCol.mul(float(1).sub(T)).add(sandCol.mul(Tc).mul(sandK));
@@ -391,14 +391,14 @@ export const WaterView = defineView<Handle>('Water', {
     (u.light.value as THREE.Vector3).set(sunRad.x * Math.max(dir.y, 0) + sky.r, sunRad.y * Math.max(dir.y, 0) + sky.g, sunRad.z * Math.max(dir.y, 0) + sky.b).multiplyScalar(1 / PI);
     const bg = three.scene.background instanceof THREE.Color ? three.scene.background : h.tmpB.set('#8ec1ee');
     (u.skyHorizon.value as THREE.Color).copy(bg);
-    (u.skyHorizon.value as THREE.Color).multiplyScalar(0.9);
+    (u.skyHorizon.value as THREE.Color).multiplyScalar(0.75);
     (u.skyZenith.value as THREE.Color).copy(bg).multiplyScalar(0.55);
     const sunUp = Math.max(0, Math.min(1, dir.y * 4)) * (sun.intensity > 0.01 ? 1 : 0);
     u.bedLight.value = sunUp * Math.max(0, 1 - self.iceEff * 0.9);
-    u.caustic.value = 1;
+    u.caustic.value = 1.6;
     u.uwK.value = h.under;
     // каустики и лучи: прозрачность и яркость
-    u.shaftK.value = 0.34 * sunUp * (1 - self.iceEff * 0.8);
+    u.shaftK.value = 0.6 * sunUp * (1 - self.iceEff * 0.8);
     (u.shaftShear.value as THREE.Vector2).set(-dir.x / Math.max(dir.y, 0.2) * 0.75, -dir.z / Math.max(dir.y, 0.2) * 0.75);
   },
 
@@ -432,7 +432,7 @@ export const WaterView = defineView<Handle>('Water', {
     uw.copy(u.shallow.value as THREE.Color).lerp(u.deep.value as THREE.Color, mixD);
     const atten = Math.exp(-depthCam / (vis * 2.2 + 1));
     u.uwLight.value = (0.55 * (light.x + light.y + light.z) / 3 + 0.04) * atten + 0.015;
-    const fogColor = h.tmpA.copy(uw).multiplyScalar(u.uwLight.value as number);
+    const fogColor = h.tmpA.copy(uw).multiplyScalar((u.uwLight.value as number) * 1.35);
     if (!(fog instanceof THREE.Fog)) { three.scene.fog = new THREE.Fog(fogColor, 0.1, vis * 3.2 + 4); h.ownFog = true; }
     const f = three.scene.fog as THREE.Fog;
     // плавный вход: между воздухом и водой — доля k

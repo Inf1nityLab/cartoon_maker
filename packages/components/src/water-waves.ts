@@ -97,7 +97,7 @@ export function seaState(i: SeaInput): SeaState {
   return {
     swell: { height: i.swell * calm, dir: i.swellDirection, scale: i.swellLength },
     wind: { height: windH * calm, dir: i.windDir, scale: wlen },
-    ripple: { height: 0.07 * rip * (1 - 0.9 * clamp(i.ice, 0, 1)), dir: 0, scale: 1 },
+    ripple: { height: 0.12 * rip * (1 - 0.9 * clamp(i.ice, 0, 1)), dir: 0, scale: 1 },
   };
 }
 
