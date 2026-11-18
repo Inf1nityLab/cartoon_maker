@@ -34,7 +34,7 @@ export function duneField(p: TerrainParams, x: number, z: number): number {
   const a = p.windDirection * RAD, dx = Math.sin(a), dz = Math.cos(a);
   const u = x * dx + z * dz, v = x * dz - z * dx, L = p.duneSpacing;
   // гребень меандрирует: фаза сдвинута шумом вдоль гребня
-  const phase = u / L + 0.55 * fbm(v / (L * 2.2), u / (L * 5), p.seed + 3, 3);
+  const phase = u / L + 0.95 * fbm(v / (L * 3.2), u / (L * 7), p.seed + 3, 3) + 0.18 * fbm(v / (L * 0.9), u / (L * 2), p.seed + 4, 2);
   const f = phase - Math.floor(phase), K = 0.7; // K — где гребень внутри шага (наветренный склон длиннее подветренного)
   const windward = Math.pow(f / K, 1.4), lee = Math.pow((1 - f) / (1 - K), 0.92);
   const profile = smin(windward, lee, 0.09);
@@ -46,7 +46,7 @@ export function duneField(p: TerrainParams, x: number, z: number): number {
   const f2 = phase2 - Math.floor(phase2);
   const sub = smin(Math.pow(f2 / 0.65, 1.3), Math.pow((1 - f2) / 0.35, 0.9), 0.12);
   const broad = fbm(x / (L * 5), z / (L * 5), p.seed + 5, 3);
-  return p.duneHeight * (0.35 + profile * amp + 0.16 * sub * (0.4 + 0.6 * amp) + 0.3 * broad);
+  return p.duneHeight * (0.35 + profile * amp + 0.07 * sub * (0.4 + 0.6 * amp) + 0.3 * broad);
 }
 
 /** Берег: расстояние вглубь суши от линии воды, м (минус — в море), с изгибом береговой линии. */

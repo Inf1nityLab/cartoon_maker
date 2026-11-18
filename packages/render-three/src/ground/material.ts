@@ -82,7 +82,7 @@ export function createGroundMaterial(opts: { seed: number; road?: RoadField; sur
       // высота над водой в этой точке: берег по высоте, а не по текселю карты (линия воды ровная при любой карте)
       const above = positionWorld.y.sub(sm.a).add(mx_noise_float(p.mul(2.3).add(sh)).mul(0.015)).toVar();
       if (sf.hasWater) {
-        shoreWet = float(0.92).mul(float(1).sub(smoothstep(0.02, 0.1, above))).add(float(0.38).mul(float(1).sub(smoothstep(0.08, 0.5, above)))).mul(nearWater).clamp(0, 1).toVar();
+        shoreWet = float(0.92).mul(float(1).sub(smoothstep(0.03, 0.14, above))).add(float(0.4).mul(float(1).sub(smoothstep(0.1, 0.7, above)))).mul(nearWater).clamp(0, 1).toVar();
         submerged = float(1).sub(smoothstep(-0.04, 0.02, above)).mul(nearWater).toVar();
       }
       const sandW = float(sf.sand ? 1 : 0).mul(sm.r).toVar();
@@ -99,7 +99,7 @@ export function createGroundMaterial(opts: { seed: number; road?: RoadField; sur
       const ph = rw.mul(6.2831853);
       const g = cos(ph).add(cos(ph.mul(2).add(0.7)).mul(0.32)).mul(0.17).mul(float(1).sub(smoothstep(0.2, 0.6, rfw))).mul(flat)
         .mul(mx_noise_float(p.mul(0.045).add(sh)).mul(0.45).add(0.75)).toVar();
-      const sA = vec3(0.4, 0.29, 0.155), sB = vec3(0.5, 0.375, 0.21);
+      const sA = vec3(0.44, 0.285, 0.14), sB = vec3(0.54, 0.365, 0.185);
       const sandCol = mix(sA, sB, mx_noise_float(p.mul(0.02).add(sh)).mul(0.5).add(0.5))
         .mul(float(1).add(mx_noise_float(p.mul(0.9).add(sh.yx)).mul(0.07).mul(detailFade(pm, 0.4)))).mul(float(1).add(cos(ph).mul(0.05).mul(flat))).toVar();
       sandCol.assign(mix(sandCol, sandCol.mul(vec3(0.9, 0.84, 0.8)), smoothstep(0.93, 0.8, normalWorld.y).mul(0.7)));
@@ -110,23 +110,21 @@ export function createGroundMaterial(opts: { seed: number; road?: RoadField; sur
         const lw = sm.g.toVar();
         const duff = vec3(0.045, 0.03, 0.017);
         colour.assign(mix(colour, duff.mul(float(0.9).add(mx_noise_float(p.mul(1.7).add(sh)).mul(0.3))), lw.mul(0.75)));
-        const LS = 0.17, lf = detailFade(pm, LS);
-        const leafAcc = float(0).toVar();
-        for (let layer = 0; layer < 3; layer++) {
+        const LS = 0.27, lf = detailFade(pm, LS);
+        for (let layer = 0; layer < 4; layer++) {
           const q = p.div(LS).add(vec2(layer * 5.31, layer * 3.77)).toVar(), c0 = floor(q), f0 = fract(q);
           const hs = uint(int(c0.x).add(8192)).mul(73856093).bitXor(uint(int(c0.y).add(8192)).mul(19349663)).bitXor(hseed).add(layer * 977);
           const ang = hash(hs.add(2)).mul(6.2831853), ca = cos(ang), sa = sin(ang);
           const off = f0.sub(vec2(hash(hs.add(3)), hash(hs.add(5))).mul(0.5).add(0.25));
           const lx = off.x.mul(ca).add(off.y.mul(sa)), ly = off.y.mul(ca).sub(off.x.mul(sa));
           const d = lx.div(0.46).mul(lx.div(0.46)).add(ly.div(0.2).mul(ly.div(0.2)));
-          const here = hash(hs.add(7)).lessThan(lw.mul(0.9).add(0.05)).select(float(1), float(0)); // у края подстилки листьев всё меньше
+          const here = hash(hs.add(7)).lessThan(lw.mul(1.05)).select(float(1), float(0)); // у края подстилки листьев всё меньше
           const m = float(1).sub(smoothstep(0.7, 1.0, d)).mul(here).mul(lf);
           const t = hash(hs.add(11));
           const leafCol = mix(mix(vec3(0.19, 0.075, 0.02), vec3(0.3, 0.17, 0.035), t.mul(2).clamp(0, 1)), vec3(0.2, 0.15, 0.04), t.sub(0.5).mul(2).clamp(0, 1))
             .mul(float(1).sub(smoothstep(0.0, 0.05, abs(ly)).oneMinus().mul(0.35)).mul(float(0.75).add(float(layer).mul(0.12))));
           colour.assign(mix(colour, leafCol, m.mul(0.92)));
           tilt.assign(tilt.add(vec2(lx, ly).mul(m).mul(0.9)));
-          leafAcc.addAssign(m);
         }
         // вдали листья мельче пикселя: средний цвет подстилки
         colour.assign(mix(colour, vec3(0.1, 0.05, 0.02), lw.mul(float(1).sub(lf)).mul(0.55)));
@@ -157,9 +155,12 @@ export function createGroundMaterial(opts: { seed: number; road?: RoadField; sur
       const sn = mx_noise_float(p.mul(0.23).add(sh)).mul(0.5).add(mx_noise_float(p.mul(1.9).add(sh.yx)).mul(0.25)).add(mx_noise_float(p.mul(9)).mul(0.06).mul(detailFade(pm, 0.1)));
       const m = uSnow.mul(1.25).add(sn.mul(0.45)).sub(slopeK.mul(0.95)).sub(0.12);
       const snowAmt = smoothstep(0.32, 0.62, m).mul(submerged ? float(1).sub(submerged) : float(1)).toVar();
-      const snowCol = vec3(0.6, 0.64, 0.7).mul(float(1).add(mx_noise_float(p.mul(14).add(sh)).mul(0.05).mul(detailFade(pm, 0.07))));
+      const snowCol = vec3(0.34, 0.37, 0.43).mul(float(1).add(mx_noise_float(p.mul(14).add(sh)).mul(0.05).mul(detailFade(pm, 0.07))));
       colour.assign(mix(colour, snowCol, snowAmt));
-      tilt.assign(tilt.mul(float(1).sub(snowAmt.mul(0.8))));
+      // снег сглаживает мелочь, но оставляет крупные наметённые волны
+      const drift = vec2(mx_noise_float(p.mul(0.55).add(sh)), mx_noise_float(p.mul(0.55).add(sh.yx.add(4)))).mul(0.45);
+      const crust = vec2(mx_noise_float(p.mul(5.5).add(sh)), mx_noise_float(p.mul(5.5).add(sh.yx.add(9)))).mul(0.05).mul(detailFade(pm, 0.15));
+      tilt.assign(tilt.mul(float(1).sub(snowAmt.mul(0.85))).add(drift.add(crust).mul(snowAmt)));
       wetV!.assign(wetAmt.mul(float(1).sub(snowAmt)));
       snowV!.assign(snowAmt);
     }

@@ -46,7 +46,7 @@ export function terrainHeight(p: TerrainParams, x: number, z: number): number {
   const d = Math.hypot(x - p.lake.at[0], z - p.lake.at[1]);
   if (p.style === 'dunes') {
     // вокруг чаши (оазиса) дюны стихают в низкий берег
-    const w = smoothstep(p.lake.radius * 0.8, p.lake.radius * 1.9, d);
+    const w = p.lake.depth > 0 ? smoothstep(p.lake.radius * 0.8, p.lake.radius * 1.9, d) : 1;
     const bank = p.duneHeight * 0.12 + 0.5;
     return bank + (duneField(p, x, z) - bank) * w - p.lake.depth * bowlProfile(p.bank, d, p.lake.radius);
   }
