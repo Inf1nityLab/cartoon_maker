@@ -4,9 +4,19 @@ import { gridIndices, gridNormals, gridStep, sampleGrid } from '@cartoon/compone
 import type { WorldState } from '@cartoon/schema';
 import { fogColorAt, skyLook, type SkyInput } from '../light/sky.ts';
 import { applyLook } from '../sky/nodes.ts';
+import { dayK, sunLevels, sunVector } from '../light/math.ts';
 import { createGroundMaterial } from '../ground/material.ts';
 
 const lerpColor = (a: THREE.Color, b: THREE.Color, t: number) => a.clone().lerp(b, Math.max(0, Math.min(1, t)));
+const NIGHT = new THREE.Color('#0a1226'), DUSK = new THREE.Color('#ff8a4c'), DAY = new THREE.Color('#8ec1ee');
+const SUN_LOW = new THREE.Color('#ff9a5a'), SUN_HIGH = new THREE.Color('#fff4e0');
+
+/** Цвет неба по высоте солнца: ночь → закат → день (прежний путь, сцены без Forces). */
+function legacySkyColor(elevation: number): THREE.Color {
+  if (elevation >= 14) return DAY.clone();
+  if (elevation >= 0) return lerpColor(DUSK, DAY, elevation / 14);
+  return lerpColor(DUSK, NIGHT, -elevation / 8);
+}
 
 export const TerrainView = defineView('Terrain', {
   mount(three) {
@@ -77,12 +87,35 @@ function skyInput(state: WorldState, f: ForcesView | undefined): SkyInput {
  */
 export const SkyView = defineView('Sky', {
   mount(three) {
-    const dome = three.sky.createDome();
-    three.scene.add(dome);
-    return { dome, bg: new THREE.Color(), key: new THREE.Color(), fogTmp: new THREE.Color() };
+    // Новое небо и свет — только в мирах с Forces; без них прежний путь (кадры старых сцен не меняются)
+    const legacy = !three.sim().services.forces;
+    const dome = legacy ? null : three.sky.createDome();
+    if (dome) three.scene.add(dome);
+    return { dome, legacy, bg: new THREE.Color(), key: new THREE.Color(), fogTmp: new THREE.Color() };
   },
   sync(h, _self, three, state) {
     const f = Object.values(state.world ?? {}).find((w) => w.type === 'Forces') as unknown as ForcesView | undefined;
+    if (h.legacy) {
+      // прежний расчёт по высоте солнца; униформы неба заполняем только для воды, которая отражает небо
+      const { elevation, azimuth } = state.sun;
+      applyLook(three.sky.u, skyLook(skyInput(state, undefined)), [state.t * 0.004, state.t * 0.0015], 0);
+      h.bg.copy(legacySkyColor(elevation));
+      three.scene.background = h.bg;
+      if (three.scene.fog instanceof THREE.Fog) three.scene.fog.color.copy(h.bg);
+      else three.scene.fog = new THREE.Fog(h.bg, 60, 320);
+      const fog = three.scene.fog as THREE.Fog;
+      fog.near = 60; fog.far = 320;
+      const k = dayK(elevation), lv = sunLevels(elevation), dir = sunVector(elevation, azimuth), target = state.camera.target;
+      h.key.copy(SUN_LOW).lerp(SUN_HIGH, k);
+      three.sunLight.target.position.set(target[0], target[1], target[2]);
+      three.sunLight.position.set(target[0] + dir[0] * 80, target[1] + dir[1] * 80, target[2] + dir[2] * 80);
+      three.sunLight.color.copy(h.key);
+      three.sunLight.intensity = lv.sun;
+      three.hemi.intensity = lv.hemi;
+      three.hemi.color.copy(h.bg);
+      three.renderer.toneMappingExposure = lv.exposure;
+      return;
+    }
     const input = skyInput(state, f);
     const look = skyLook(input);
     const t = state.t;
@@ -120,5 +153,5 @@ export const SkyView = defineView('Sky', {
     three.skyState.daylight = look.daylight;
     three.renderer.toneMappingExposure = look.exposure;
   },
-  dispose(h, three) { three.scene.remove(h.dome); h.dome.geometry.dispose(); (h.dome.material as THREE.Material).dispose(); three.skyState.active = false; },
+  dispose(h, three) { if (h.dome) { three.scene.remove(h.dome); h.dome.geometry.dispose(); (h.dome.material as THREE.Material).dispose(); } three.skyState.active = false; },
 });

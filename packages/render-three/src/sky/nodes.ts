@@ -47,9 +47,9 @@ export function createSky() {
     const plane = vec2(d.x, d.z).div(y.add(CLOUD_LIFT));
     const uv = plane.mul(0.22).add(u.cloudOffset);
     const n = tex.sample(uv).r.mul(0.62).add(tex.sample(uv.mul(3.1).add(0.37)).r.mul(0.38));
-    const cut = mix(float(0.72), float(0.31), u.cloudCover);
+    const cut = mix(float(0.78), float(0.31), u.cloudCover);
     // сплошная облачность закрывает небо целиком, без просветов
-    const dens = mix(smoothstep(cut, cut.add(0.13), n), float(1), smoothstep(0.82, 1.0, u.cloudCover)).mul(smoothstep(0.0, 0.12, y));
+    const dens = mix(smoothstep(cut, cut.add(0.13), n), float(1), smoothstep(0.82, 1.0, u.cloudCover)).mul(smoothstep(0.0, 0.12, y)).mul(smoothstep(0.0, 0.04, u.cloudCover)); // ясно (0) — облаков нет совсем
     // свет: смотрим, что лежит ближе к солнцу; плотнее — значит мы в тени, реже — край на свету
     const toSun = normalize(vec2(u.sunDir.x, u.sunDir.z).add(0.0001));
     const n2 = tex.sample(uv.add(toSun.mul(0.035))).r.mul(0.62).add(tex.sample(uv.mul(3.1).add(0.37).add(toSun.mul(0.1))).r.mul(0.38));
