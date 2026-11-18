@@ -75,19 +75,6 @@ export const Terrain = defineComponent({
   examples: ["s.world.use('Terrain', { style: 'hills', seed: 7 })"],
 });
 
-export const Water = defineComponent({
-  type: 'Water',
-  version: 1,
-  describe: 'Вода на заданном уровне (озеро появляется там, где рельеф ниже). Предоставляет ctx.waterLevel.',
-  params: z.object({ level: z.number().min(-50).max(50).default(-0.4), color: z.string().default('#2a6f97') }),
-  actions: {},
-  setup(ctx, p) { ctx.provide('waterLevel', p.level); },
-  create: () => ({}),
-  step() {},
-  state: () => ({}),
-  examples: ["s.world.use('Water', { level: -0.4 })"],
-});
-
 type SkySelf = { elevation: number; azimuth: number };
 
 /**

@@ -55,6 +55,23 @@ export type ForcesField = {
   sun(): { elevation: number; azimuth: number };
 };
 
+/** Вода как поле (6.5): где она, какой глубины, куда течёт. Даёт компонент Water; только числа и функции. */
+export type WaterField = {
+  /** Разобранные параметры воды (с умолчаниями): вид берёт форму и цвета отсюда. */
+  config: Record<string, any>;
+  /** Центр воды [x, z] и область, в которой считается карта глубины. */
+  center: [number, number];
+  bounds: { x0: number; x1: number; z0: number; z1: number };
+  /** Вода продолжается за область до горизонта (океан). */
+  open: boolean;
+  /** Средний уровень поверхности в точке, м; null — воды здесь нет. */
+  level(x: number, z: number): number | null;
+  /** Глубина воды в точке, м (0 на суше). Всегда level − heightAt или 0. */
+  depth(x: number, z: number): number;
+  /** Единичное направление течения в точке ([0,0] — течения нет). */
+  flowDir(x: number, z: number): [number, number];
+};
+
 /**
  * Сервисы, которые мир предоставляет компонентам (Terrain даёт heightAt, Water — waterLevel, Road — grade и road).
  * grade: рельеф под дорогой; Terrain вызывает его при сборке сетки высот (base — высота без дороги).
@@ -66,6 +83,7 @@ export type Services = {
   road?: RoadField;
   terrain?: TerrainInfo;
   forces?: ForcesField;
+  water?: WaterField;
 };
 
 /** Мировые сервисы. Компоненты не ссылаются друг на друга напрямую — только через ctx. */

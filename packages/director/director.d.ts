@@ -43,16 +43,175 @@ export type Terrain = HandleBase;
  *   s.world.use('Terrain', { style: 'hills', seed: 7 })
  */
 
-/** Вода на заданном уровне (озеро появляется там, где рельеф ниже). Предоставляет ctx.waterLevel. */
+/** Вода: пруд, озеро, ручей, река, океан, оазис. Знает место: заполняет ложбину до уровня (береговая линия по ctx.heightAt, глубина и цвет по глубине) или идёт по пути с руслом (река). Волны слоями (зыбь, ветровые, рябь), пена, каустики на дне, лёд, подводный вид. Слушает ветер и температуру сил мира. Ручки: waveHeight, swell, ripple, windSensitivity, flowSpeed, clarity, foam, reflection, ice, цвета. Поведения: ripple, storm, calm, freeze, thaw, splash. Для реки объявлять после Terrain и Road. */
 export interface WaterParams {
-  /** от -50; до 50; по умолчанию -0.4 */
+  /** realistic — вода с волнами, глубиной и берегом; classic — прежний простой полупрозрачный лист (старые сцены); по умолчанию "realistic" */
+  style?: "realistic" | "classic";
+  /** basin — вода в ложбине на уровне level; river — по пути path с руслом; по умолчанию "basin" */
+  shape?: "basin" | "river";
+  /** вода продолжается за область до горизонта (океан); по умолчанию false */
+  open?: boolean;
+  /** уровень воды, м; от -50; до 50; по умолчанию -0.4 */
   level?: number;
-  /** по умолчанию "#2a6f97" */
+  /** точка [x, z] внутри ложбины: вода заполняет связную область ниже уровня вокруг неё. Без неё — всё, что ниже уровня */
+  at?: [number, number];
+  /** как далеко от at искать берег, м; от 5; до 600; по умолчанию 120 */
+  reach?: number;
+  /** id пути в scene.paths (shape: river): ось русла */
+  path?: string;
+  /** ширина русла, м (shape: river); от 0.4; до 80; по умолчанию 6 */
+  width?: number;
+  /** ширина берега, на которой земля сходит к руслу, м (river); от 0.3; до 30; по умолчанию 3 */
+  bank?: number;
+  /** глубина русла посередине, м (river); от 0.05; до 12; по умолчанию 1.2 */
+  depth?: number;
+  /** на какой длине вдоль русла выравнивается уровень, м (river); от 2; до 300; по умолчанию 20 */
+  smooth?: number;
+  /** глубина за областью, м (open); от 1; до 300; по умолчанию 40 */
+  deepDepth?: number;
+  /** цвет листа воды (style: classic); по умолчанию "#2a6f97" */
   color?: string;
+  /** цвет мелководья; по умолчанию "#5fc4c0" */
+  shallowColor?: string /* '#rrggbb' */;
+  /** цвет глубины; по умолчанию "#0c3f5c" */
+  deepColor?: string /* '#rrggbb' */;
+  /** цвет дна (песок), когда bedBlend > 0; по умолчанию "#d9c79a" */
+  bedColor?: string /* '#rrggbb' */;
+  /** 0 — сквозь воду видно настоящую землю, 1 — песчаное дно цвета bedColor; от 0; до 1; по умолчанию 0 */
+  bedBlend?: number;
+  /** прозрачность воды: 0 мутная (видно на сантиметры), 1 чистая (видно на десятки метров); от 0; до 1; по умолчанию 0.6 */
+  clarity?: number;
+  /** высота ветровых волн без ветра, м (значимая высота); от 0; до 8; по умолчанию 0 */
+  waveHeight?: number;
+  /** высота океанской зыби, м: идёт независимо от местного ветра; от 0; до 8; по умолчанию 0 */
+  swell?: number;
+  /** куда идёт зыбь, ° (0 — на север +z, 90 — на восток +x); от 0; до 360; по умолчанию 270 */
+  swellDirection?: number;
+  /** длина волны зыби, м; от 8; до 250; по умолчанию 40 */
+  swellLength?: number;
+  /** рябь: 0 зеркальная гладь, 1 сильная рябь; от 0; до 1; по умолчанию 0.3 */
+  ripple?: number;
+  /** добавка к ряби от порыва, 0…1 (обычно 0; меняется поведением ripple); от 0; до 1; по умолчанию 0 */
+  rippleBoost?: number;
+  /** как сильно вода слушает ветер сил мира: 0 — никак, 1 — как открытое море; от 0; до 1; по умолчанию 0.4 */
+  windSensitivity?: number;
+  /** скорость течения, м/с (у реки — вдоль пути); от 0; до 8; по умолчанию 0 */
+  flowSpeed?: number;
+  /** куда течёт вода, ° (у basin; у реки течение идёт вдоль пути); от 0; до 360; по умолчанию 90 */
+  flowDirection?: number;
+  /** пена: у берега и на гребнях волн; от 0; до 1; по умолчанию 0.5 */
+  foam?: number;
+  /** сила отражений неба и солнца; от 0; до 1; по умолчанию 0.8 */
+  reflection?: number;
+  /** лёд: 0 чистая вода, 1 сплошной лёд; от 0; до 1; по умолчанию 0 */
+  ice?: number;
+  /** слушает температуру: 1 — вода замерзает при морозе (ниже freezeAt) сама, 0 — только по ручке ice; от 0; до 1; по умолчанию 0 */
+  temperatureSensitivity?: number;
+  /** температура начала льда, °C (полностью покрыта на 6 °C ниже); от -30; до 10; по умолчанию 0 */
+  freezeAt?: number;
+  /** id сущностей, от которых по воде идут круги (когда они в воде); по умолчанию [] */
+  touchers?: string[];
+  /** места на воде под то, что будут добавлять другие объекты (кувшинки, камыш, водоросли, рыбы): id, [x, z], радиус, вид; по умолчанию [] */
+  spots?: {
+    id: string;
+    at: [number, number];
+    /** от 0.1; до 50; по умолчанию 1 */
+    radius?: number;
+    /** по умолчанию "lily" */
+    kind?: string;
+  }[];
+  /** seed волн; по умолчанию 3 */
+  seed?: number;
+  /** попадает ли вода в отчёт о мире (WorldState); по умолчанию true */
+  report?: boolean;
 }
-export type Water = HandleBase;
+/** Пресеты Water: ocean-tropical, ocean-storm, lake-mountain, pond-forest, pond-lilies, creek, river, oasis */
+export type WaterPreset = "ocean-tropical" | "ocean-storm" | "lake-mountain" | "pond-forest" | "pond-lilies" | "creek" | "river" | "oasis";
+export interface Water extends HandleBase {
+  /** действие ripple */
+  ripple(args?: {
+    /** на сколько усиливается рябь на пике, 0…1; от 0.05; до 1; по умолчанию 0.6 */
+    strength?: number;
+    /** сколько длится порыв ряби, с; от 0.4; до 60; по умолчанию 3 */
+    duration?: number;
+  }): Command;
+  /** действие storm */
+  storm(args?: {
+    /** за сколько секунд волнение нарастает, с; от 0; до 600; по умолчанию 8 */
+    over?: number;
+    /** сила шторма 0…1: ветровые волны до 2.5 м и зыбь до 4 м, больше пены, мутнее вода; от 0; до 1; по умолчанию 1 */
+    severity?: number;
+  }): Command;
+  /** действие calm */
+  calm(args?: {
+    /** за сколько секунд вода успокаивается до глади, с; от 0; до 600; по умолчанию 5 */
+    over?: number;
+  }): Command;
+  /** действие freeze */
+  freeze(args?: {
+    /** за сколько секунд вода замерзает, с; от 0; до 3600; по умолчанию 8 */
+    over?: number;
+  }): Command;
+  /** действие thaw */
+  thaw(args?: {
+    /** за сколько секунд лёд тает, с; от 0; до 3600; по умолчанию 8 */
+    over?: number;
+  }): Command;
+  /** действие splash */
+  splash(args: {
+    /** куда упало: [x, y, z] или id места/сущности */
+    at: string | [number, number, number];
+    /** сила круга; от 0.1; до 2; по умолчанию 1 */
+    strength?: number;
+  }): Command;
+  /** Ручка «waveHeight»: высота ветровых волн без ветра, м (значимая высота). Единицы: м. Диапазон 0…8. */
+  set(handle: "waveHeight", value: number): Command;
+  to(handle: "waveHeight", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «swell»: высота океанской зыби, м: идёт независимо от местного ветра. Единицы: м. Диапазон 0…8. */
+  set(handle: "swell", value: number): Command;
+  to(handle: "swell", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «swellDirection»: куда идёт зыбь, ° (0 — на север +z, 90 — на восток +x). Единицы: °. Диапазон 0…360. */
+  set(handle: "swellDirection", value: number): Command;
+  to(handle: "swellDirection", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «ripple»: рябь: 0 зеркальная гладь, 1 сильная рябь. Диапазон 0…1. */
+  set(handle: "ripple", value: number): Command;
+  to(handle: "ripple", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «rippleBoost»: добавка к ряби от порыва, 0…1 (обычно 0; меняется поведением ripple). Диапазон 0…1. */
+  set(handle: "rippleBoost", value: number): Command;
+  to(handle: "rippleBoost", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «windSensitivity»: как сильно вода слушает ветер сил мира: 0 — никак, 1 — как открытое море. Диапазон 0…1. */
+  set(handle: "windSensitivity", value: number): Command;
+  to(handle: "windSensitivity", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «flowSpeed»: скорость течения, м/с (у реки — вдоль пути). Единицы: м/с. Диапазон 0…8. */
+  set(handle: "flowSpeed", value: number): Command;
+  to(handle: "flowSpeed", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «flowDirection»: куда течёт вода, ° (у basin; у реки течение идёт вдоль пути). Единицы: °. Диапазон 0…360. */
+  set(handle: "flowDirection", value: number): Command;
+  to(handle: "flowDirection", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «clarity»: прозрачность воды: 0 мутная (видно на сантиметры), 1 чистая (видно на десятки метров). Диапазон 0…1. */
+  set(handle: "clarity", value: number): Command;
+  to(handle: "clarity", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «foam»: пена: у берега и на гребнях волн. Диапазон 0…1. */
+  set(handle: "foam", value: number): Command;
+  to(handle: "foam", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «reflection»: сила отражений неба и солнца. Диапазон 0…1. */
+  set(handle: "reflection", value: number): Command;
+  to(handle: "reflection", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «ice»: лёд: 0 чистая вода, 1 сплошной лёд. Диапазон 0…1. */
+  set(handle: "ice", value: number): Command;
+  to(handle: "ice", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «shallowColor»: цвет мелководья. */
+  set(handle: "shallowColor", value: string /* '#rrggbb' */): Command;
+  to(handle: "shallowColor", value: string /* '#rrggbb' */, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «deepColor»: цвет глубины. */
+  set(handle: "deepColor", value: string /* '#rrggbb' */): Command;
+  to(handle: "deepColor", value: string /* '#rrggbb' */, opts?: { over?: number; ease?: Ease }): Command;
+}
 /* Примеры:
- *   s.world.use('Water', { level: -0.4 })
+ *   s.world.use('Water', { shape: 'basin', at: [0, 0], level: -0.4, clarity: 0.5 })
+ *   s.path('water', { points: [[-40,0,-20],[0,0,0],[40,0,20]] }); s.world.use('Water', { shape: 'river', path: 'water', width: 6 })
+ *   water.to('ice', 1, { over: 8 })
+ *   s.at(5).do(water.storm({ over: 6 }))
  */
 
 /** Небо и солнце. Действие sun меняет высоту и азимут (градусы), можно плавно за duration секунд. Если в мире есть Forces, солнце идёт по часам суток, а эти значения не используются. */
