@@ -107,6 +107,52 @@
         "кадры демо — мишень внешнего вида мелководья и бликов (test-results/B1-keep/ref-ocean-*.png); код каустиков не читали, свои считаются по лапласиану высоты (якобиан преломления)",
         "Б3, песчаное дно и пляж (по кадрам и описанию): дно уходит под воду пологим уклоном с песчаными валами, у кромки воды полоса мокрого песка темнее и глаже; у нас — beachHeight и мокрый пояс по высоте над водой в шейдере земли. Код свой"
       ]
+    },
+    {
+      "id": "100style",
+      "name": "100STYLE (стили ходьбы и бега, BVH)",
+      "url": "https://www.ianxmason.com/100style/",
+      "license": "CC-BY-4.0",
+      "licenseSeen": "Страница 2026-11-21: «This work is licensed under a Creative Commons Attribution 4.0 International License»; текст сохранён в sources/_eval/100style/LICENSE-as-seen.txt",
+      "copyright": "Ian Mason, Sebastian Starke, Taku Komura",
+      "credit": "The 100STYLE Dataset — Ian Mason (автор в титры)",
+      "takenFiles": [
+        "Только записи движений (повороты суставов), перенесённые на наш скелет и сжатые: packages/components/src/biped/clips/library.json. Сырой архив BVH лежит в sources/_eval/100style/ (в git не попадает). Скелет и модели базы не берём."
+      ],
+      "clips": "s100.<стиль>.walk|run|idle для стилей Neutral, Old, Proud, Depressed, Angry, Zombie, Strutting, Rushed (из файлов <Стиль>_FW/FR/ID.bvh)",
+      "ourComponents": [
+        "Biped"
+      ],
+      "status": "used",
+      "notes": "Перенос: scripts/biped/ (ручной запуск, не в рантайме)."
+    },
+    {
+      "id": "quaternius-ual",
+      "name": "Universal Animation Library [Standard] (Quaternius)",
+      "url": "https://quaternius.com/packs/universalanimationlibrary.html",
+      "license": "CC0-1.0",
+      "licenseSeen": "Страница quaternius.com и itch.io 2026-11-21: «Free to use in personal, educational and commercial projects. (CC0 License)»; License.txt в архиве: CC0 1.0; сохранено в sources/_eval/quaternius-ual/",
+      "copyright": "Quaternius (CC0, автор в титрах не обязателен)",
+      "takenFiles": [
+        "Только записи движений из UAL1_Standard.glb и UAL1_Standard_RM.glb (Idle_Loop, Walk_Loop, Walk_Formal_Loop, Jog_Fwd_Loop, Hit_Chest, Jump_Start, Jump_Land), перенесённые на наш скелет. Модель и скелет Quaternius не берём. Архив — в sources/_eval/quaternius-ual/ (в git не попадает)."
+      ],
+      "ourComponents": [
+        "Biped"
+      ],
+      "status": "used",
+      "notes": "Скорость Jog и Sprint в данных завышена (до 5–8 м/с по корню): Sprint не берём, Jog — как быстрый бег."
+    },
+    {
+      "id": "mocap-forbidden",
+      "name": "Запрещено для Biped",
+      "license": "n/a",
+      "excluded": [
+        {
+          "path": "CMU, AMASS, LAFAN1 (Ubisoft), Bandai Namco, Mixamo",
+          "why": "решение владельца 21.11: ни в каком виде (ни клипы, ни модели, ни скелеты)"
+        }
+      ],
+      "status": "forbidden"
     }
   ]
 }

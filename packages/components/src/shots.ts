@@ -153,3 +153,20 @@ export const Fixed = defineShot({
   },
   examples: ["s.at(0).camera.shot('fixed', { at: [0, 0.5, -18], look: [0, 0.4, 0], velocity: [0, 2] })"],
 });
+
+export const Track = defineShot({
+  type: 'track',
+  describe: 'Камера едет вместе с целью: стоит на заданном смещении от неё (в осях мира, не по курсу) и смотрит на точку рядом с ней. Для боковой съёмки идущего человека.',
+  params: z.object({
+    target: Target,
+    offset: Vec3Z.describe('смещение камеры от цели [x, высота, z], м (высота — над землёй под камерой)'),
+    aim: Vec3Z.default([0, 0.9, 0]).describe('куда смотреть: смещение от цели [x, высота над точкой цели, z], м'),
+    fov: z.number().min(10).max(110).default(42),
+  }),
+  solve(a, ctx) {
+    const p = ctx.resolve(a.target);
+    const x = p[0] + a.offset[0], zz = p[2] + a.offset[2];
+    return { pos: [x, ctx.heightAt(x, zz) + a.offset[1], zz], target: [p[0] + a.aim[0], p[1] + a.aim[1], p[2] + a.aim[2]], fov: a.fov };
+  },
+  examples: ["s.at(0).camera.shot('track', { target: person, offset: [3.4, 0.9, 0] })"],
+});
