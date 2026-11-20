@@ -39,6 +39,7 @@
 | Источник | Коммит | Лицензия | Где лежит | Что взято |
 |---|---|---|---|---|
 | threejs-nanites, © 2026 Victor Zakharov, https://github.com/VictorZakharov/threejs-nanites | `cde2f4d4bb3414553b9e39fd317186c97b3154ad` | MIT | `packages/render-three/vendor/threejs-nanites/` (с их LICENSE) | только `src/nanite-lib/` (рендерер кластерного LOD) |
+| threejs-nanites (там же) | `cde2f4d4bb3414553b9e39fd317186c97b3154ad` | MIT | `packages/render-three/vendor/threejs-nanites-demo/` (с их LICENSE) | только функция `noiseTexture` из `src/clouds.ts` (бесшовный шум-fbm для облаков неба, Б5); правка `// OURS:` — экспорт и размер параметром |
 
 Не взято: `public/models/lucy.nm` и `lucy4m.nm` (модель Stanford, только некоммерческое использование: запрещена по лицензии), `public/audio/ambience.mp3`, всё из `public/` (текстуры, thumbs, rock.glb), демо-код (`src/forest`, `src/webgl`, `src/taa.ts`, `src/warmup.ts`, UI). Подробнее: `sources/catalog.json`.
 

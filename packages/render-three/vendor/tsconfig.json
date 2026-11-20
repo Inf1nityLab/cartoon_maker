@@ -13,6 +13,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["threejs-nanites/**/*.ts"],
+  "include": ["threejs-nanites/**/*.ts", "threejs-nanites-demo/**/*.ts"],
   "exclude": ["**/node_modules"]
 }

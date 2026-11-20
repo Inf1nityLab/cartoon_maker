@@ -37,7 +37,7 @@ export const TreeView = defineView<Handle>('Tree', {
     three.scene.add(h.root);
     return h;
   },
-  sync(h, s: TreeSelf, _three, state) {
+  sync(h, s: TreeSelf, three, state) {
     if (s.stage !== h.stage) {
       const g = stageGeometry(h, s.stage);
       h.barkMesh.geometry = g.bark; h.leafMesh.geometry = g.leaves; h.stage = s.stage;
@@ -56,6 +56,7 @@ export const TreeView = defineView<Handle>('Tree', {
     (u.bend.value as THREE.Vector2).set(s.bend[0] * c - s.bend[1] * sn, s.bend[0] * sn + s.bend[1] * c);
     u.t.value = state.t; u.flut.value = s.flutter; u.girth.value = s.girth;
     u.snow.value = s.snowLoad; u.autumn.value = s.autumn;
+    u.selfLit.value = three.skyState.active ? three.skyState.daylight : 1;
     if (s.leafColor !== h.leafColor) { u.leaf.value.set(s.leafColor); h.leafColor = s.leafColor; }
     const n = Math.round(s.leafDensity * g.leafUnits);
     h.leafMesh.visible = n > 0;

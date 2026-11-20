@@ -118,7 +118,7 @@ test.describe('деревья (Б2): ветер', () => {
   });
 
   test('TAA в листве на ветру: ошибка против накопления мала, шлейфа нет (серия кадров подряд)', async () => {
-    const q = (extra: string, wind = 7) => lib(`object=Tree&preset=birch&view=close&time=11&clouds=0&wind=${wind}&winddir=90&p.height=12${extra}`, '&w=640&h=360');
+    const q = (extra: string, wind = 7) => lib(`object=Tree&preset=birch&view=close&time=11&clouds=0&wind=${wind}&winddir=90&p.height=12&zoom=0.7${extra}`, '&w=640&h=360'); // zoom: листва занимает больше кадра, небо (теперь с куполом) разбавляет метрику меньше
     const run = async (query: string, action: string, noPrev = false) => {
       const browser = await chromium.launch({ channel: 'chrome', args: ARGS });
       try {
@@ -153,6 +153,7 @@ test.describe('деревья (Б2): ветер', () => {
       windTaaVsAccum16: stats(taa, ref), windNoAA: stats(off, ref), windTaaWithoutPrevPosition: stats(noPrev, ref),
       calmTaaVsAccum16: stats(taaCalm, refCalm), calmFrameToFrame: stats(taaCalm, next),
     };
+    mkdirSync(OUT, { recursive: true });
     writeFileSync(`${OUT}/taa-wind-vs-accum16.json`, JSON.stringify(r, null, 2));
     // шлейфа нет: на ветру TAA ошибается лишь немного больше, чем на безветрии, и заметно меньше, чем без положения вершин в прошлом кадре
     expect(r.windTaaVsAccum16.meanAbs, 'ветер против безветрия').toBeLessThan(r.calmTaaVsAccum16.meanAbs + 1.5);

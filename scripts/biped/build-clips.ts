@@ -79,7 +79,7 @@ function alignLeftFoot(s: Series, i: number, P: number): number {
 
 // ---------- Quaternius UAL ----------
 const glbRM = readGlb(`${UAL}/UAL1_Standard_RM.glb`), glb = readGlb(`${UAL}/UAL1_Standard.glb`);
-const UAL_LOOPS: [string, string, boolean][] = [['Idle_Loop', 'idle', false], ['Walk_Loop', 'walk', true], ['Walk_Formal_Loop', 'walk-formal', true], ['Jog_Fwd_Loop', 'jog', true]];
+const UAL_LOOPS: [string, string, boolean][] = [['Idle_Loop', 'idle', false], ['Walk_Loop', 'walk', true], ['Walk_Formal_Loop', 'walk-formal', true], ['Jog_Fwd_Loop', 'fast-run', true]];
 const UAL_SHOTS: [string, string][] = [['Hit_Chest', 'hit-chest'], ['Jump_Start', 'jump-start'], ['Jump_Land', 'jump-land']];
 for (const [an, tag, moving] of UAL_LOOPS) {
   const m = glbMotion(glbRM, an);

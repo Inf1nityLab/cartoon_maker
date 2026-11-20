@@ -41,7 +41,7 @@ export function createSunShadow(light: THREE.DirectionalLight, renderer: THREE.W
 
   let info: CascadeInfo[] = [];
   /** Перед каждым render(): подогнать каскады под текущие fov/aspect камеры и пересчитать смещения. */
-  function update(): CascadeInfo[] {
+  function update(soft = 0): CascadeInfo[] {
     csm.updateFrustums();
     info = csm.lights.map((l, i) => {
       const s = l.shadow!, cam = s.camera;
@@ -49,7 +49,8 @@ export function createSunShadow(light: THREE.DirectionalLight, renderer: THREE.W
       // глубина света: от света (LIGHT_MARGIN за куском) до самой дальней точки куска ≤ extent·1.5
       cam.near = 1; cam.far = LIGHT_MARGIN + extent * 1.5 + 50;
       cam.updateProjectionMatrix();
-      s.radius = pcfRadius(texel);
+      s.radius = pcfRadius(texel) * (1 + 2 * soft); // сплошная облачность: тень мягче и бледнее
+      s.intensity = 1 - 0.7 * soft;
       s.normalBias = NORMAL_BIAS_TEXELS * texel;
       s.bias = (-DEPTH_BIAS_TEXELS * texel) / (cam.far - cam.near);
       return { to: SPLITS[i]!, extent, texel, radius: s.radius, normalBias: s.normalBias, bias: s.bias };

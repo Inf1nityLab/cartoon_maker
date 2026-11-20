@@ -37,7 +37,7 @@ export type BipedSim = {
 export const STYLE_NAMES: string[] = ['ual', ...Array.from(new Set(Object.keys(CLIPS).filter((n) => n.startsWith('s100.') && n.endsWith('.walk')).map((n) => n.split('.')[1]!)))];
 
 export function tiers(style: string): { idle: Clip; walk: Clip; run: Clip } {
-  if (style === 'ual') return { idle: clipOf('ual.idle'), walk: clipOf('ual.walk'), run: clipOf('ual.jog') };
+  if (style === 'ual') return { idle: clipOf('ual.idle'), walk: clipOf('ual.walk'), run: clipOf('ual.fast-run') };
   return { idle: clipOf(`s100.${style}.idle`), walk: clipOf(`s100.${style}.walk`), run: clipOf(`s100.${style}.run`) };
 }
 
