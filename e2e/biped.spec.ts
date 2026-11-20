@@ -49,8 +49,9 @@ test.describe('Biped: витрина', () => {
 
   test('клипы: по 3 из каждой базы, серии по 6 кадров', async () => {
     test.skip(!on('clips'));
-    const clips = ['s100.proud.walk', 's100.angry.run', 's100.old.walk', 'ual.walk', 'ual.jog', 'ual.hit-chest'];
-    for (const c of clips) await series(`clip-${c}`, `view=side&p.clip=${c}`, [0.1, 0.3, 0.5, 0.7, 0.9, 1.1]);
+    const clips = (process.env.H1CLIPS ?? 's100.proud.walk,s100.angry.run,s100.old.walk,ual.walk,ual.jog,ual.hit-chest').split(',');
+    // разовый клип «удар в грудь» длится 0,33 с: кадры чаще
+    for (const c of clips) await series(`clip-${c}`, `view=side&p.clip=${c}`, c === 'ual.hit-chest' ? [0.0, 0.07, 0.13, 0.2, 0.27, 0.33] : [0.1, 0.3, 0.5, 0.7, 0.9, 1.1]);
   });
 
   test('склейка шаг → бег', async () => {
