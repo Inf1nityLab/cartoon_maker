@@ -13,6 +13,8 @@ export type TreeUniforms = {
   t: { value: number }; tPrev: { value: number }; flut: { value: number }; flutPrev: { value: number };
   girth: { value: number }; girthPrev: { value: number };
   snow: { value: number }; autumn: { value: number };
+  /** Собственное свечение коры и листвы, доля от прежнего: 1 днём, уходит к ночи (по свету вокруг, из неба). */
+  selfLit: { value: number };
   leaf: { value: THREE.Color }; autumnColor: { value: THREE.Color }; barkTint: { value: THREE.Color };
 };
 export type TreeLook = { bark: THREE.Material; leaves: THREE.Material; u: TreeUniforms; dispose(): void };
@@ -23,7 +25,7 @@ export function createTreeLook(bark: BarkTex, leaf: LeafTex, init: { leaf: strin
   const u = {
     bend: uniform(new THREE.Vector2()), bendPrev: uniform(new THREE.Vector2()),
     t: uniform(0), tPrev: uniform(0), flut: uniform(0), flutPrev: uniform(0), girth: uniform(1), girthPrev: uniform(1),
-    snow: uniform(0), autumn: uniform(0),
+    snow: uniform(0), autumn: uniform(0), selfLit: uniform(1),
     leaf: uniform(new THREE.Color(init.leaf)), autumnColor: uniform(new THREE.Color(init.autumn)), barkTint: uniform(new THREE.Color(init.barkTint)),
   };
 
@@ -54,7 +56,7 @@ export function createTreeLook(bark: BarkTex, leaf: LeafTex, init: { leaf: strin
   const barkTex = texture(bark.color, uv());
   const snowUp = u.snow.mul(smoothstep(-0.35, 0.3, normalWorld.y));
   barkMat.colorNode = mix(barkTex.rgb.mul(u.barkTint).mul(3), SNOW, snowUp);
-  barkMat.emissiveNode = barkTex.rgb.mul(0.12);
+  barkMat.emissiveNode = barkTex.rgb.mul(0.12).mul(u.selfLit);
   barkMat.normalNode = normalMap(texture(bark.normal, uv()), vec2(0.8, 0.8));
   barkMat.positionNode = move(false);
 
@@ -70,7 +72,7 @@ export function createTreeLook(bark: BarkTex, leaf: LeafTex, init: { leaf: strin
   const snowLeaf = u.snow.mul(smoothstep(0.25, 0.8, normalWorld.y.add(d.x.sub(0.5).mul(0.5))));
   const rgb = mix(base, SNOW, snowLeaf);
   leafMat.colorNode = vec4(rgb, lt.a);
-  leafMat.emissiveNode = rgb.mul(0.22);
+  leafMat.emissiveNode = rgb.mul(0.22).mul(u.selfLit);
   leafMat.alphaTest = 0.5;
   leafMat.maskShadowNode = lt.a.greaterThan(0.5);
   leafMat.positionNode = move(true);

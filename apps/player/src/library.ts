@@ -26,6 +26,14 @@ if (!def) {
 const show: Showcase = def.showcase ?? { kind: 'entity', size: 1 };
 const objId = def.type.toLowerCase();
 const TERRAIN_LIKE = ['Terrain', 'Road'];
+/** Луг: холмы с озером и деревьями по берегам. Для неба и сил мира (Sky, Forces) это сцена по умолчанию, для остальных объектов — meadow=1. Камера: az (куда смотрит, °, 0 — на север), pitch (наклон вверх, °). */
+const meadow = objectName === 'Sky' || objectName === 'Forces' || q.get('meadow') === '1';
+const MEADOW_TERRAIN = { style: 'hills', seed: 7, amplitude: 3.5, scale: 0.05, size: 240, segments: 384, ground: 'soil', lake: { at: [0, 0] as [number, number], radius: 34, depth: 9 } };
+const MEADOW_TREES: [az: number, r: number, species: string, seed: number][] = [
+  [250, 41, 'oak', 11], [268, 46, 'birch', 12], [285, 40, 'pine', 13], [302, 47, 'oak', 14], [232, 50, 'spruce', 15], [318, 52, 'birch', 16],
+  [70, 41, 'oak', 21], [92, 46, 'birch', 22], [112, 40, 'aspen', 23], [136, 46, 'oak', 24], [158, 42, 'birch', 25], [52, 50, 'pine', 26],
+  [0, 44, 'oak', 31], [20, 48, 'spruce', 32], [180, 44, 'birch', 33], [200, 50, 'oak', 34], [345, 46, 'aspen', 35],
+];
 const ALL_PRESETS = def.presets ?? {};
 const fields = paramFields(def);
 
@@ -68,6 +76,15 @@ const FAMILY_GAP = show.size * 1.8;
 
 /** Камера витрины: именованные виды считаются от размера объекта (showcase.size) и высоты взгляда (showcase.eye). */
 function viewShot(name: string): { at: Vec3; look: Vec3; fov: number; abs?: boolean } {
+  if (meadow) {
+    // камера стоит на берегу и смотрит через озеро на заданный азимут: на воде и дальнем береге видно небо и свет
+    const az = num(q.get('az'), 270) * Math.PI / 180, R = name === 'ground' ? 33 : 37, h = name === 'ground' ? 0.5 : name === 'top' ? 60 : q.has('camy') ? num(q.get('camy'), 5) : 5;
+    const pitch = num(q.get('pitch'), name === 'close' ? 14 : 5) * Math.PI / 180;
+    const at: Vec3 = [-Math.sin(az) * R, h, -Math.cos(az) * R];
+    if (name === 'top') return { at: [0, 110, -1], look: [0, 0, 0], fov: 50, abs: true };
+    const D = 60;
+    return { at, look: [at[0] + Math.sin(az) * D * Math.cos(pitch), at[1] + Math.sin(pitch) * D, at[2] + Math.cos(az) * D * Math.cos(pitch)], fov: num(q.get('fov'), name === 'close' ? 38 : 55) };
+  }
   const sv = setupOf()?.views?.[name];
   if (sv) return { at: sv.at, look: sv.look, fov: sv.fov ?? 45, abs: sv.abs === true };
   // объект меняет размер вместе с параметром height (если он есть): камера держит его в кадре
@@ -92,9 +109,10 @@ function build(): SceneDoc {
   const doc = buildScene((s) => {
     const setup = setupOf();
     if (objectName === 'Terrain') s.world.use('Terrain', params);
-    else s.world.use('Terrain', hills ? (setup?.terrain ?? { style: 'hills', seed: 7 }) : { style: 'flat' });
+    else s.world.use('Terrain', meadow ? MEADOW_TERRAIN : hills ? (setup?.terrain ?? { style: 'hills', seed: 7 }) : { style: 'flat' });
     if (setup?.path) s.path('water', { points: setup.path });
-    if (hills && objectName !== 'Water' && !(objectName === 'Terrain' && setup?.world)) s.world.use('Water', {});
+    if (meadow && objectName !== 'Water') s.world.use('Water', (registry.components.Water!.params as unknown as { parse(x: unknown): Params }).parse(registry.components.Water!.presets!['pond-forest']));
+    else if (hills && objectName !== 'Water' && !(objectName === 'Terrain' && setup?.world)) s.world.use('Water', {});
     if (objectName === 'Sky') s.world.use('Sky', params);
     else { s.world.use('Sky', {}); s.world.use('Forces', objectName === 'Forces' ? params : forcesParams); }
     if (objectName === 'Terrain') {
@@ -112,6 +130,16 @@ function build(): SceneDoc {
       s.places({ rover0: [-13, 0, -10], rover1: [3, 0, -6] });
       const rover = s.add('Robot', {}, { at: 'rover0', heading: 90, id: 'rover' });
       s.at(0.5).do(rover.roll({ to: 'rover1', speed: 0.7 }));
+    }
+    if (meadow) {
+      const tp = registry.components.Tree!;
+      const cam = viewShot(viewName).at;
+      MEADOW_TREES.forEach(([az, r, species, seed], i) => {
+        const a = az * Math.PI / 180;
+        if (Math.hypot(Math.sin(a) * r - cam[0], Math.cos(a) * r - cam[2]) < 16) return; // дерево не заслоняет камеру
+        s.places({ [`spot${i}`]: [Math.sin(a) * r, 0, Math.cos(a) * r] });
+        s.add('Tree', { ...(tp.params as unknown as { parse(x: unknown): Params }).parse(tp.presets![species]), seed: seed * 977 }, { at: `spot${i}`, heading: (seed * 53) % 360, id: `tree${i}` });
+      });
     }
     if (show.kind === 'entity' && isFamily()) {
       const over = readOverrides();
@@ -218,7 +246,7 @@ function control(f: Field, store: Params, onChange: () => void, out?: string): H
     c.oninput = () => { store[f.name] = c.value; onChange(); }; row.append(c);
   } else {
     const r = document.createElement('input'); r.type = 'range'; r.id = `f-${f.name}`;
-    const min = f.min ?? 0, max = f.max ?? Math.max(1, Number(value) * 2);
+    const min = f.min ?? 0, max = f.name === 'time' ? 24 : f.max ?? Math.max(1, Number(value) * 2);
     r.min = String(min); r.max = String(max); r.step = f.integer ? '1' : String((max - min) / 400);
     r.value = String(value);
     const o = document.createElement('output'); o.id = out ?? `f-${f.name}-out`; o.textContent = fmt(Number(value));

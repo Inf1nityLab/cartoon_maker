@@ -17,13 +17,15 @@ const RAD = Math.PI / 180;
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 const smoothstep = (a: number, b: number, x: number) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const wrap360 = (a: number) => ((a % 360) + 360) % 360;
+/** Часы суток по кругу: 26 → 2, −1 → 23. Ручка `time` идёт вперёд через полночь (to('time', 26) = к 02:00 следующих суток). */
+export const wrapHours = (h: number): number => ((h % 24) + 24) % 24;
 const dirOf = (elevation: number, azimuth: number): Vec3 => {
   const el = elevation * RAD, az = azimuth * RAD;
   return [Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)];
 };
 
 export const ForcesParams = z.object({
-  time: z.number().min(0).max(24).default(12).describe('время суток, часы (0–24; 5 — восход, 12 — полдень, 19 — закат, 0 — полночь)'),
+  time: z.number().min(0).max(24).default(12).describe('время суток, часы (0–24; 5 — восход, 12 — полдень, 19 — закат, 0 — полночь). Ручкой можно дойти до 96: больше 24 — следующие сутки (26 = 02:00)'),
   sunArc: z.number().min(10).max(90).default(62).describe('наибольшая высота солнца в полдень, ° (меньше — севернее или зимой)'),
   windDirection: z.number().min(0).max(360).default(90).describe('куда дует ветер, ° (0 — на север, +z; 90 — на восток, +x)'),
   windStrength: z.number().min(0).max(30).default(2).describe('сила ветра, м/с (2 — лёгкий, 8 — свежий, 15 — шторм)'),
@@ -52,6 +54,9 @@ export const sunStrength = (elevation: number): number => smoothstep(-1, 10, ele
 /** Лунный свет по высоте луны и фазе. */
 export const moonStrength = (elevation: number, phase: number): number => smoothstep(2, 14, elevation) * phase;
 
+/** Облака плывут со скоростью ветра ×CLOUD_DRIFT (в единицах текстуры неба в секунду на м/с): быстрее настоящих, чтобы дрейф был виден в кадре. */
+const CLOUD_DRIFT = 0.006;
+
 const SHADOW_STEPS = [0.4, 0.9, 1.8, 3.5, 7, 14, 28, 56];
 /** Тень рельефа: идём от точки к солнцу и смотрим, не заслонил ли склон. 1 — открыто, 0.18 — в тени (рассеянный свет остаётся). */
 function terrainShade(ctx: Ctx, p: Vec3, dir: Vec3): number {
@@ -66,10 +71,21 @@ function terrainShade(ctx: Ctx, p: Vec3, dir: Vec3): number {
 export const Forces = defineComponent({
   type: 'Forces',
   version: 1,
-  describe: 'Силы мира: время суток (солнце, луна, звёзды), ветер (направление, сила, порывы), облачность, туман, температура. Объекты слушают их через ctx.wind(p), ctx.light(p), ctx.temperature(p), ctx.timeOfDay с собственной чувствительностью. Ручки: time, windStrength, windDirection, gustiness, cloudiness, fog, temperature, moonPhase. Поведения: gust, calm, sunset, sunrise.',
+  describe: 'Силы мира: время суток (солнце, луна, звёзды), ветер (направление, сила, порывы), облачность, туман, температура. Объекты слушают их через ctx.wind(p), ctx.light(p), ctx.temperature(p), ctx.timeOfDay с собственной чувствительностью. Ручка time идёт по кругу: to(time, 26) приходит к 02:00 вперёд через полночь. Небо (облака, луна с фазой, звёзды, дымка) и свет на земле считает вид Sky по этим силам; облака плывут по ветру. Пресеты: dawn, noon, golden-hour, sunset, moonlit-night, overcast, foggy-morning. Ручки: time, windStrength, windDirection, gustiness, cloudiness, fog, temperature, moonPhase. Поведения: gust, calm, sunset, sunrise.',
   params: ForcesParams,
+  // пресеты времени суток и погоды: рассвет, полдень, золотой час, закат, ночь с луной, пасмурно, туманное утро
+  presets: {
+    dawn: ForcesParams.parse({ time: 5.5, cloudiness: 0.25, fog: 0.12, windStrength: 1, gustiness: 0.2 }),
+    noon: ForcesParams.parse({ time: 12.5, cloudiness: 0.12 }),
+    'golden-hour': ForcesParams.parse({ time: 18.2, cloudiness: 0.3, windStrength: 2 }),
+    sunset: ForcesParams.parse({ time: 18.95, cloudiness: 0.4, windStrength: 1.5 }),
+    'moonlit-night': ForcesParams.parse({ time: 22, cloudiness: 0.1, moonPhase: 1, windStrength: 1 }),
+    overcast: ForcesParams.parse({ time: 13, cloudiness: 1, windStrength: 4, gustiness: 0.4 }),
+    'foggy-morning': ForcesParams.parse({ time: 6.8, cloudiness: 0.35, fog: 0.7, windStrength: 0.5, gustiness: 0.1 }),
+  },
   handles: {
-    time: { unit: 'ч' },
+    // ручка шире параметра: время идёт по кругу, to('time', 26) приходит к 02:00 вперёд через полночь, а не назад через весь день
+    time: { unit: 'ч', schema: z.number().min(0).max(96).default(12).describe('время суток, часы; больше 24 — следующие сутки (26 = 02:00), мир показывает остаток от деления на 24') },
     windDirection: { unit: '°' },
     windStrength: { unit: 'м/с' },
     gustiness: {},
@@ -92,7 +108,8 @@ export const Forces = defineComponent({
     const id = ctx.componentId;
     const v = <K extends keyof ForcesParams>(name: K): ForcesParams[K] => (ctx.handleOf(id, name) as ForcesParams[K] | undefined) ?? p[name];
     const noise = seedFrom(ctx.seed, id);
-    const sunNow = () => sunAt(v('time'), p.sunArc);
+    const hours = () => wrapHours(v('time'));
+    const sunNow = () => sunAt(hours(), p.sunArc);
 
     /** Сила ветра в точке сейчас (м/с) и его направление (°): ровный ветер плюс порывы, бегущие вдоль ветра. */
     const windAt = (pt: Vec3): Vec3 => {
@@ -106,7 +123,7 @@ export const Forces = defineComponent({
     };
 
     const field: ForcesField = {
-      timeOfDay: () => v('time'),
+      timeOfDay: hours,
       sun: sunNow,
       wind: windAt,
       light(pt): LightAt {
@@ -124,7 +141,7 @@ export const Forces = defineComponent({
         const s = sunNow(), cloud = v('cloudiness'), w = windAt([0, 0, 0]);
         const moonEl = -s.elevation;
         return {
-          time: v('time'),
+          time: hours(),
           sunLight: { elevation: s.elevation, azimuth: s.azimuth, strength: sunStrength(s.elevation) * (1 - 0.78 * cloud) },
           moonLight: { elevation: moonEl, azimuth: wrap360(s.azimuth + 180), strength: moonStrength(moonEl, v('moonPhase')) * (1 - 0.7 * cloud), phase: v('moonPhase') },
           stars: clamp((-s.elevation - 4) / 10, 0, 1) * (1 - 0.8 * cloud),
@@ -137,8 +154,12 @@ export const Forces = defineComponent({
     };
     ctx.provide('forces', field);
   },
-  create: () => ({}),
-  step() {},
+  // облака плывут по ветру: смещение накапливается по тактам (перемотка = проигрывание, лежит в чекпоинтах)
+  create: () => ({ cloud: [0, 0] as [number, number] }),
+  step(self, dt, ctx) {
+    const w = ctx.service('forces')?.wind([0, 0, 0]);
+    if (w) { self.cloud[0] += w[0] * dt * CLOUD_DRIFT; self.cloud[1] += w[2] * dt * CLOUD_DRIFT; }
+  },
   onAction(_s, name, a, ctx) {
     switch (name) {
       case 'gust':
@@ -150,10 +171,10 @@ export const Forces = defineComponent({
       case 'sunrise': ctx.handles.to('time', 5.5, { over: a.over, ease: 'ease-in-out' }); break;
     }
   },
-  state: (_s, ctx) => {
+  state: (s, ctx) => {
     const f = ctx.service('forces');
     if (!f) return {};
-    return { sun: f.sun(), ...f.summary() };
+    return { sun: f.sun(), ...f.summary(), cloud: [Math.round(s.cloud[0] * 1e5) / 1e5, Math.round(s.cloud[1] * 1e5) / 1e5] };
   },
   showcase: {
     kind: 'world', size: 40, eye: 1.5, ground: 'hills',
@@ -166,6 +187,13 @@ export const Forces = defineComponent({
         { t: 3, action: 'gust', args: { strength: 9, duration: 3 } },
         { t: 6, action: 'handle.to', args: { handle: 'cloudiness', value: 0.8, over: 6, ease: 'linear' } },
         { t: 9, action: 'handle.to', args: { handle: 'time', value: 23, over: 4, ease: 'ease-in' } },
+      ],
+    }, {
+      title: 'Сутки за 20 с (через полночь)',
+      duration: 22,
+      steps: [
+        { t: 0, action: 'handle.set', args: { handle: 'time', value: 5 } },
+        { t: 0.5, action: 'handle.to', args: { handle: 'time', value: 29, over: 20, ease: 'linear' } },
       ],
     }],
   },

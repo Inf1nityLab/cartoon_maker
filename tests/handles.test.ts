@@ -90,7 +90,7 @@ describe('ручки: сразу, цвет, список, схема', () => {
   it('диапазон, единицы и описание берутся из схемы', () => {
     const info = handleInfos(Forces);
     expect(Object.keys(info).sort()).toEqual(['cloudiness', 'fog', 'gustBoost', 'gustiness', 'moonPhase', 'temperature', 'time', 'windDirection', 'windStrength']);
-    expect(info.time).toMatchObject({ kind: 'number', unit: 'ч', min: 0, max: 24, default: 12 });
+    expect(info.time).toMatchObject({ kind: 'number', unit: 'ч', min: 0, max: 96, default: 12 }); // Б5: ручка time шире параметра (0–24): больше 24 — следующие сутки, to(time, 26) = к 02:00
     expect(info.time!.describe).toMatch(/время суток/);
     expect(handleInfos(Robot).lightColor).toMatchObject({ kind: 'color', default: '#59fff3' });
     expect(handleInfos(FilmLook).crop).toMatchObject({ kind: 'step', options: ['none', '2.39:1', '9:16'] });
