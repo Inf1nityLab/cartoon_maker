@@ -50,7 +50,7 @@ function plain(args: Record<string, unknown>): Record<string, unknown> {
 
 type Focus = { focus?: number | 'target'; range?: number; strength?: number };
 type Sun = { elevation?: number; azimuth?: number; duration?: number };
-type ShotName = 'establishing' | 'follow' | 'lowAngle' | 'orbit' | 'closeup' | 'crane' | 'fixed' | 'glide';
+type ShotName = 'establishing' | 'follow' | 'lowAngle' | 'orbit' | 'closeup' | 'crane' | 'fixed' | 'glide' | 'track';
 
 export type Director = {
   places(p: Record<string, Vec3>): void;

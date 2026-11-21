@@ -10,6 +10,7 @@ import { sunVector } from './light/math.ts';
 import type { DofSettings, LookSettings, PostFrame } from './frame/post.ts';
 import { MultipedView } from './views/multiped.ts';
 import { RobotView } from './views/robot.ts';
+import { BipedView } from './views/biped.ts';
 import { TreeView } from './views/tree.ts';
 import { SkyView, TerrainView } from './views/world.ts';
 import { WaterView } from './views/water.ts';
@@ -52,7 +53,7 @@ export interface RenderAdapter {
   dispose(): void;
 }
 
-export const defaultViews: ViewRegistry = Object.fromEntries([TerrainView, WaterView, SkyView, MultipedView, RobotView, TreeView]) as ViewRegistry;
+export const defaultViews: ViewRegistry = Object.fromEntries([TerrainView, WaterView, SkyView, MultipedView, RobotView, TreeView, BipedView]) as ViewRegistry;
 
 /**
  * backend: 'auto' — WebGPU, при его отсутствии WebGL2 (откат делает сам three).

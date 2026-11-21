@@ -691,6 +691,67 @@ export interface Tree extends HandleBase {
  *   birch.set("windSensitivity", 2)   // чутче к ветру
  */
 
+/** Двуногое существо со своим скелетом (кости по стандарту VRM). Движения — клипы из разрешённых баз (100STYLE, Quaternius UAL), перенесённые на скелет: ходьба и бег по скорости, смешивание двух стилей, склейка клипов с плавным переходом, слой верха тела (взгляд, оглядывание, отшатывание), стопы не скользят (IK). Ручки: clip, speed, style, lookAt. Глаголы: walkTo, stop, startle, lookAround. */
+export interface BipedParams {
+  /** рост, м; от 0.4; до 2.6; по умолчанию 1.7 */
+  height?: number;
+  /** длина ног относительно типичной (1 = как есть); от 0.7; до 1.3; по умолчанию 1 */
+  legLength?: number;
+  /** длина рук относительно типичной; от 0.7; до 1.3; по умолчанию 1 */
+  armLength?: number;
+  /** ширина плеч и таза относительно типичной; от 0.6; до 1.5; по умолчанию 1 */
+  shoulderWidth?: number;
+  /** первый стиль ходьбы (100STYLE или «ual»); по умолчанию "proud" */
+  styleA?: "ual" | "neutral" | "old" | "proud" | "depressed" | "angry" | "zombie" | "strutting" | "rushed";
+  /** второй стиль: смешивается с первым по весу style; по умолчанию "neutral" */
+  styleB?: "ual" | "neutral" | "old" | "proud" | "depressed" | "angry" | "zombie" | "strutting" | "rushed";
+  /** имя клипа из библиотеки; пусто — ходьба по скорости; по умолчанию "" */
+  clip?: "" | "biped.rest-pose" | "s100.neutral.walk" | "s100.neutral.run" | "s100.neutral.idle" | "s100.old.walk" | "s100.old.run" | "s100.old.idle" | "s100.proud.walk" | "s100.proud.run" | "s100.proud.idle" | "s100.depressed.walk" | "s100.depressed.run" | "s100.depressed.idle" | "s100.angry.walk" | "s100.angry.run" | "s100.angry.idle" | "s100.zombie.walk" | "s100.zombie.run" | "s100.zombie.idle" | "s100.strutting.walk" | "s100.strutting.run" | "s100.strutting.idle" | "s100.rushed.walk" | "s100.rushed.run" | "s100.rushed.idle" | "ual.idle" | "ual.walk" | "ual.walk-formal" | "ual.fast-run" | "ual.hit-chest" | "ual.jump-start" | "ual.jump-land";
+  /** скорость ходьбы вперёд, м/с (ноль — стоит); от 0; до 4; по умолчанию 0 */
+  speed?: number;
+  /** вес смешивания стилей: 0 — только styleA, 1 — только styleB; от 0; до 1; по умолчанию 0 */
+  style?: number;
+  /** куда смотреть: id места или сущности, «camera», пусто — прямо; по умолчанию "" */
+  lookAt?: string;
+}
+/** Пресеты Biped: adult, tall, child, stocky */
+export type BipedPreset = "adult" | "tall" | "child" | "stocky";
+export interface Biped extends HandleBase {
+  /** действие walkTo */
+  walkTo(args: {
+    /** куда идти: точка, место или сущность */
+    to: string | [number, number, number];
+    /** скорость, м/с; от 0.1; до 4; по умолчанию 1.2 */
+    speed?: number;
+  }): Command;
+  /** действие stop */
+  stop(args?: Record<string, unknown>): Command;
+  /** действие startle */
+  startle(args?: Record<string, unknown>): Command;
+  /** действие lookAround */
+  lookAround(args?: Record<string, unknown>): Command;
+  /** Ручка «clip»: имя клипа из библиотеки; пусто — ходьба по скорости. Только скачком (set); to держит старое до конца отрезка. */
+  set(handle: "clip", value: "" | "biped.rest-pose" | "s100.neutral.walk" | "s100.neutral.run" | "s100.neutral.idle" | "s100.old.walk" | "s100.old.run" | "s100.old.idle" | "s100.proud.walk" | "s100.proud.run" | "s100.proud.idle" | "s100.depressed.walk" | "s100.depressed.run" | "s100.depressed.idle" | "s100.angry.walk" | "s100.angry.run" | "s100.angry.idle" | "s100.zombie.walk" | "s100.zombie.run" | "s100.zombie.idle" | "s100.strutting.walk" | "s100.strutting.run" | "s100.strutting.idle" | "s100.rushed.walk" | "s100.rushed.run" | "s100.rushed.idle" | "ual.idle" | "ual.walk" | "ual.walk-formal" | "ual.fast-run" | "ual.hit-chest" | "ual.jump-start" | "ual.jump-land"): Command;
+  to(handle: "clip", value: "" | "biped.rest-pose" | "s100.neutral.walk" | "s100.neutral.run" | "s100.neutral.idle" | "s100.old.walk" | "s100.old.run" | "s100.old.idle" | "s100.proud.walk" | "s100.proud.run" | "s100.proud.idle" | "s100.depressed.walk" | "s100.depressed.run" | "s100.depressed.idle" | "s100.angry.walk" | "s100.angry.run" | "s100.angry.idle" | "s100.zombie.walk" | "s100.zombie.run" | "s100.zombie.idle" | "s100.strutting.walk" | "s100.strutting.run" | "s100.strutting.idle" | "s100.rushed.walk" | "s100.rushed.run" | "s100.rushed.idle" | "ual.idle" | "ual.walk" | "ual.walk-formal" | "ual.fast-run" | "ual.hit-chest" | "ual.jump-start" | "ual.jump-land", opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «speed»: скорость ходьбы вперёд, м/с (ноль — стоит). Единицы: м/с. Диапазон 0…4. */
+  set(handle: "speed", value: number): Command;
+  to(handle: "speed", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «style»: вес смешивания стилей: 0 — только styleA, 1 — только styleB. Диапазон 0…1. */
+  set(handle: "style", value: number): Command;
+  to(handle: "style", value: number, opts?: { over?: number; ease?: Ease }): Command;
+  /** Ручка «lookAt»: куда смотреть: id места или сущности, «camera», пусто — прямо. Только скачком (set); to держит старое до конца отрезка. */
+  set(handle: "lookAt", value: string | number | boolean): Command;
+  to(handle: "lookAt", value: string | number | boolean, opts?: { over?: number; ease?: Ease }): Command;
+}
+/* Примеры:
+ *   person.walkTo({ to: "door", speed: 1.2 })
+ *   person.startle()
+ *   person.lookAround()
+ *   person.stop()
+ *   person.set("clip", "s100.proud.run")
+ *   person.to("style", 1, { over: 4 })
+ */
+
 /** кадр «establishing»: Общий план: высоко и далеко, сзади-сбоку. Показывает, где происходит действие. */
 export type EstablishingShotArgs = {
   target: string | [number, number, number];
@@ -829,6 +890,17 @@ export type GlideShotArgs = {
   fov?: number;
 };
 
+/** кадр «track»: Камера едет вместе с целью: стоит на заданном смещении от неё (в осях мира, не по курсу) и смотрит на точку рядом с ней. Для боковой съёмки идущего человека. */
+export type TrackShotArgs = {
+  target: string | [number, number, number];
+  /** смещение камеры от цели [x, высота, z], м (высота — над землёй под камерой) */
+  offset: [number, number, number];
+  /** куда смотреть: смещение от цели [x, высота над точкой цели, z], м; по умолчанию [0,0.9,0] */
+  aim?: [number, number, number];
+  /** от 10; до 110; по умолчанию 42 */
+  fov?: number;
+};
+
 export interface Director {
   places(p: Record<string, [number, number, number]>): void;
   path(id: string, p: { points: [number, number, number][]; closed?: boolean }): void;
@@ -853,4 +925,5 @@ export interface Components {
   FilmLook: { params: FilmLookParams; handle: FilmLook };
   Robot: { params: RobotParams; handle: Robot };
   Tree: { params: TreeParams; handle: Tree };
+  Biped: { params: BipedParams; handle: Biped };
 }

@@ -70,12 +70,12 @@ const filmSize = { w: num(q.get('w'), 1280), h: num(q.get('h'), 720) };
 const FPS = num(q.get('fps'), 30);
 
 // ---------- сцена вокруг объекта ----------
-const VIEWS: Record<string, string> = { general: 'общий', close: 'крупно', ground: 'у земли', top: 'сверху', ...(familyNames.length ? { family: 'семья' } : {}) };
+const VIEWS: Record<string, string> = { general: 'общий', close: 'крупно', ground: 'у земли', top: 'сверху', ...(familyNames.length ? { family: 'семья' } : {}), ...Object.fromEntries(Object.keys(setupOf()?.views ?? {}).filter((k) => k !== 'dive').map((k) => [k, k])) };
 const isFamily = () => viewName === 'family' && familyNames.length > 0;
 const FAMILY_GAP = show.size * 1.8;
 
 /** Камера витрины: именованные виды считаются от размера объекта (showcase.size) и высоты взгляда (showcase.eye). */
-function viewShot(name: string): { at: Vec3; look: Vec3; fov: number; abs?: boolean } {
+function viewShot(name: string): { at: Vec3; look: Vec3; fov: number; abs?: boolean; track?: boolean } {
   if (meadow) {
     // камера стоит на берегу и смотрит через озеро на заданный азимут: на воде и дальнем береге видно небо и свет
     const az = num(q.get('az'), 270) * Math.PI / 180, R = name === 'ground' ? 33 : 37, h = name === 'ground' ? 0.5 : name === 'top' ? 60 : q.has('camy') ? num(q.get('camy'), 5) : 5;
@@ -86,7 +86,7 @@ function viewShot(name: string): { at: Vec3; look: Vec3; fov: number; abs?: bool
     return { at, look: [at[0] + Math.sin(az) * D * Math.cos(pitch), at[1] + Math.sin(pitch) * D, at[2] + Math.cos(az) * D * Math.cos(pitch)], fov: num(q.get('fov'), name === 'close' ? 38 : 55) };
   }
   const sv = setupOf()?.views?.[name];
-  if (sv) return { at: sv.at, look: sv.look, fov: sv.fov ?? 45, abs: sv.abs === true };
+  if (sv) return { at: sv.at, look: sv.look, fov: sv.fov ?? 45, abs: sv.abs === true, ...(sv.track ? { track: true } : {}) };
   // объект меняет размер вместе с параметром height (если он есть): камера держит его в кадре
   const k = (typeof params.height === 'number' && typeof defaultsOf.height === 'number' ? Math.max(0.06, params.height / defaultsOf.height) : 1) * num(q.get('zoom'), 1);
   const far = show.kind === 'world' ? 0.4 : 1; // объекты мира снимаются ближе, относительно их размера
@@ -151,7 +151,8 @@ function build(): SceneDoc {
       });
     } else if (show.kind === 'entity') { s.places({ center: [0, 0, 0] }); s.add(objectName, params, { at: 'center', heading: 175, id: objId }); }
     const v = viewShot(viewName);
-    s.at(0).camera.shot('fixed', { at: v.at, look: v.look, fov: v.fov, aboveGround: !v.abs });
+    if (v.track && show.kind === 'entity') s.at(0).camera.shot('track', { target: objId, offset: v.at, aim: v.look, fov: v.fov });
+    else s.at(0).camera.shot('fixed', { at: v.at, look: v.look, fov: v.fov, aboveGround: !v.abs });
     const dv0 = setupOf()?.views?.dive;
     const dv = dv0 && q.has('dy') ? { ...dv0, at: [dv0.at[0], num(q.get('dy'), dv0.at[1]), dv0.at[2]] as [number, number, number] } : dv0;
     if (diveAt !== null && dv && v.abs) {

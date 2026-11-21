@@ -6,10 +6,11 @@ import { Multiped } from './multiped.ts';
 import { FilmLook } from './filmlook.ts';
 import { Robot } from './robot/index.ts';
 import { Road } from './road.ts';
+import { Biped } from './biped/index.ts';
 import { Tree } from './tree/index.ts';
-import { Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed, Glide } from './shots.ts';
+import { Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed, Glide, Track } from './shots.ts';
 
-export const registry = createRegistry([Terrain, Water, Sky, Forces, Road, Multiped, FilmLook, Robot, Tree], [Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed, Glide]);
+export const registry = createRegistry([Terrain, Water, Sky, Forces, Road, Multiped, FilmLook, Robot, Tree, Biped], [Establishing, Follow, LowAngle, Orbit, Closeup, Crane, Fixed, Glide, Track]);
 export { Terrain, Sky, terrainHeight, TerrainParams, frostFactor, type TerrainSelf } from './world.ts';
 export { duneField, beachHeight, beachInland, sandWeight, bowlProfile } from './terrain-forms.ts';
 export { bakeSurfaceMap, SURFACE_FAR, type SurfaceMap, type Crown } from './surface-map.ts';
@@ -22,3 +23,4 @@ export { Road, buildRoad, RoadParams } from './road.ts';
 export { gridHeight, gridIndices, gridNormals, gridStep, sampleGrid, type GridSpec } from './terrain-grid.ts';
 export { Forces, ForcesParams, sunAt, sunStrength, moonStrength, wrapHours } from './forces.ts';
 export { Tree, TreeParams, TREE_PRESETS, RECIPES, SPECIES, ageStage, ageScale, ageGirth, ezOptions, type TreeSelf, type Species, type BarkKind, type LeafKind, type TreeShape } from './tree/index.ts';
+export { Biped, BipedParams, BIPED_PRESETS, BONES, B as BIPED_BONE, NB as BIPED_BONES, PARENT as BIPED_PARENT, TIPS as BIPED_TIPS, CLIPS, CLIP_NAMES, STYLE_NAMES, type BipedSelf, type Clip } from './biped/index.ts';

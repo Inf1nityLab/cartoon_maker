@@ -11,6 +11,19 @@
 | meshoptimizer | 1.3.0 | MIT (© 2016–2026 Arseny Kapoulkine; LICENSE.md пакета этой версии проверен) | только `packages/render-three`: упрощение и кодирование кластеров в nanite-lib | https://github.com/zeux/meshoptimizer |
 | @dgreenheck/ez-tree | 1.1.0 | MIT (© 2024 Daniel Greenheck; LICENSE пакета этой версии проверен) | только `packages/render-three`: генерация деревьев; его картинки коры и листьев (`src/lib/assets`) берём из самого пакета; числа его готовых наборов (Oak/Ash/Aspen/Pine Medium, Bush 1–3) перенесены данными в `packages/components/src/tree/recipes.ts` | https://github.com/dgreenheck/ez-tree |
 
+## Данные движений (Biped)
+
+Записи движений, перенесённые на наш скелет (`packages/components/src/biped/clips/library.json`). Сырые базы в репозиторий не входят (`sources/_eval/`). Скелеты и модели людей из баз не берём.
+
+| База | Лицензия | Авторы и ссылка | Что взято |
+|---|---|---|---|
+| **100STYLE** — «The 100STYLE Dataset» | CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/) — **авторов указывать в титрах** | Ian Mason, Sebastian Starke, Taku Komura — https://www.ianxmason.com/100style/ | ходьба, бег и стойка восьми стилей (Neutral, Old, Proud, Depressed, Angry, Zombie, Strutting, Rushed): повороты суставов, сжатые и перенесённые на наш скелет. Сжатие, зацикливание и перенос — наши |
+| **Universal Animation Library [Standard]** | CC0 1.0 (автор в титрах не обязателен) | Quaternius — https://quaternius.com/packs/universalanimationlibrary.html | стойка, ходьба, быстрый бег, «удар в грудь», прыжок: только движения, перенесённые на наш скелет |
+
+Титры для фильма: «Motion data: The 100STYLE Dataset — Ian Mason, Sebastian Starke, Taku Komura (CC BY 4.0); Universal Animation Library — Quaternius (CC0)».
+
+Запрещены для Biped ни в каком виде: CMU, AMASS, LAFAN1 (Ubisoft), база Bandai Namco, Mixamo.
+
 ## Только инструменты разработки
 
 | Пакет | Лицензия | Зачем |

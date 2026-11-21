@@ -185,7 +185,7 @@ export type ShowSetup = {
   /** Путь scene.paths.water для рек и ручьёв */
   path?: [number, number, number][];
   /** Именованные виды: at и look — [x, высота, z]; abs — высоты абсолютные, иначе над землёй; dive — вид «под водой» для кнопки «нырнуть» */
-  views?: Record<string, { at: [number, number, number]; look: [number, number, number]; fov?: number; abs?: boolean }>;
+  views?: Record<string, { at: [number, number, number]; look: [number, number, number]; fov?: number; abs?: boolean; /** at и look — смещения от объекта, камера едет за ним (shot track) */ track?: boolean }>;
   /** Другие компоненты мира рядом (вода у берега). Если задано (даже пустым), витрина Terrain не добавляет воду по умолчанию */
   world?: { type: string; params: Record<string, unknown> }[];
   /** Сущности на сцене (деревья в лесной поляне): at — [x, z], на землю ставится сама */
